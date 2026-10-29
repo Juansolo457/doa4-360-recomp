@@ -6,10 +6,25 @@ state, the build/run detail and where things live. Update it at the end of every
 next model starts here, not from chat history.
 
 ## Where it stands
-**M1 nearly there (2026-10-29): runs 2 and 3 reach the main menus, Sparring and character select at
-the game's 60 fps, then crash loading a fight with Ryu Hayabusa; run 4 played a full fight with Kasumi.** The
-cause is an out-of-bounds read in the original game, an ID of -256 in Ryu's animation script;
-a guard for it is in the manifest, not yet built. M0 is done (below).
+**M1 reached (2026-10-29): menus, character select and full fights play at 60 fps, Ryu Hayabusa
+included since run 7** (his crash was an out-of-bounds read in the original game, now guarded).
+Open: Ryu's animations look wrong to the user. M0 is done (below).
+
+### Run 7 (2026-10-29, animation-ID guard built; `port/logs/smoke-20261029-091851.log`)
+**No crash with Ryu Hayabusa.** The guard dropped -256 four times (its log cap) and two Watch-mode
+fights with Ryu played to the end, Hayate on the ring stage and on the helipad, at 60 fps, then
+back to the title screen (the game was closed there, `TerminateTitle`, no crash report).
+- **Open: the user reports Ryu's animations look wrong** ("the animation timing thing"), on the
+  select screen and in the fight. The user's desktop recording of the second fight (NVIDIA
+  capture, 83 s, 60 fps) shows smooth pacing: a new game frame in every captured frame, one hitch.
+  In stills the fight looks plausible (throws, knockdowns, effects). The one clear oddity: on the
+  select screen Ryu's model drifts up out of his panel after the face close-up (panel empty for
+  about 1.5 s), then comes back cut off at the shoulders and slides down.
+- **The guard is probably not the cause:** the table it guards looks like facial expressions
+  (the same function picks a random entry about every 60 frames, like idle blinking). Not proven.
+- **Next:** timestamps from the user of what looks wrong, and a reference of the real game's
+  select screen and Ryu fight; then compare against Kasumi (run 4) to tell a Ryu-only fault from
+  a general animation one (bone blending, VMX128 maths).
 
 ### Run 6 (2026-10-29, script-dispatch probe, Ryu as player 1; `port/logs/smoke-20261029-085747.log`)
 Same crash. **The dump settled it:** the stream the interpreter ran is Ryu's `ryu.bin` from
@@ -160,9 +175,9 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Rebuild with the animation-ID guard and play a fight with Ryu Hayabusa** (needs the user's
-   OK): expect "DOA4: dropped animation ID -256" in the log, no crash, and Ryu looking right.
-   Then a few other characters, to see nothing else reads past a table.
+1. **Ryu's animation fault** (run 7): get the user's timestamps and a reference of the real
+   game, find whether it is Ryu-only or general, then trace it (motion data, bone blending,
+   vector maths). Each build and run needs the user's OK.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
 3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
