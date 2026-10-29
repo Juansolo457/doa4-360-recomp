@@ -11,7 +11,8 @@ every character tried so far, Ryu Hayabusa included since run 9** (his scripts w
 unrelocated because his file loaded at guest 0x10000; `src/low_memory.cpp` keeps that range
 free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below). PR #1 (all of
 it, 1440p Windows default) was reviewed by CodeRabbit and merged on 2026-10-29. **Now: the native
-Linux build for the Steam Deck** (branch `linux-native`, below): scripts written, nothing built.
+Linux build for the Steam Deck** (branch `linux-native`, below): the SDK and the game build in
+WSL2 and boot natively to the title screen (Linux run 1); the Deck build is next.
 
 ### Run 10 (2026-10-29, 4K internal: `--resolution_scale=3 --anisotropic_override=5`; `port/logs/smoke-20261029-104915.log`)
 First run of the build without the trace and guard, and the first at 4K: the renderer reports
@@ -229,7 +230,8 @@ decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Native Linux (2026-10-29, branch linux-native)
 The second stream (the user, 2026-10-29): a native build for the Steam Deck, no Proton or Wine,
-720p by default there. **Written, not built or run yet** (every build needs the user's OK).
+720p by default there. **Builds and boots to the title in WSL2 (Linux run 1, below); not yet
+built for or run on the Deck** (every build needs the user's OK).
 - **Scripts** (from graw360-recomp via doax2-360-recomp, which builds and runs natively in WSL2):
   `tools/setup-linux.sh`, `tools/build-linux.sh`, `tools/build-deck.sh` (Ubuntu 22.04 container
   `tools/linux/deck.Containerfile`, podman, glibc 2.35 at most), and `tools/steamdeck/`:
@@ -238,8 +240,8 @@ The second stream (the user, 2026-10-29): a native build for the Steam Deck, no 
   16x AF, the low-memory reservation on, log flush every second), `README-SteamDeck-Linux.txt`.
   The Deck folder is `~/recomps/DOA4-360-SteamDeck` (AGENTS.md).
 - **SDK:** the Windows tree 12884d9 (GRAW's set plus vexptefp-underflow, the same as GRAW's), then
-  seven Linux patches in their own commit, tree **c66e664** (applied and checked with a scratch
-  index, 2026-10-29; no SDK built yet): GRAW's four (`launch-title-path`,
+  seven Linux patches in their own commit, tree **c66e664** (built in WSL2 on 2026-10-29, both
+  tree checks passing): GRAW's four (`launch-title-path`,
   `linux-crash-renderdoc`, `linux-shm-unlink`, `linux-crash-watchdog`; GRAW's Linux tree f481d5e)
   and DOAX2's three for this engine: `bind-low-port` (system link's VDP socket binds port 1000,
   which Linux refuses to a normal user), `linux-socket-ioctl` (Winsock FIONBIO/FIONREAD and errno
@@ -247,20 +249,46 @@ The second stream (the user, 2026-10-29): a native build for the Steam Deck, no 
   the same socket calls (`NetDll_bind`, `ioctlsocket`, `recvfrom`, `sendto`, `WSAGetLastError`)
   and uses XAPI fibers, so these are expected to be needed; not yet proven for DOA4.
 - **Host code:** already guarded for non-Windows (`crash_report.cpp`, `cpu_check.cpp`,
-  `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. No change
-  made; the first Linux build will show what is missing.
-- **WSL2** (Ubuntu 26.04, clang 21, CMake 4.2, podman): no DOA4 checkout or SDK there yet. GRAW's
-  and DOAX2's Linux SDKs are other trees (GRAW's host 379fa50, its Deck f481d5e; DOAX2's fc48868),
-  so DOA4 builds its own (about an hour). The `doa4-deck-build` image is the same Containerfile as
-  the existing `doax2-deck-build`, so podman's layer cache should make it quick.
+  `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. It built on
+  Linux unchanged, with no compiler warnings. One gap from run 1: `ui_style.cpp` looked for the
+  dialog font only in `C:\Windows\Fonts`, so on Linux the runtime's dialogs kept the SDK's 10 px
+  font. It now tries Noto Sans (SteamOS's default sans; the Deck has it and DejaVu Sans) and
+  DejaVu Sans at the Arch and Debian paths. Not yet built or run (needs the user's OK).
+- **WSL2** (Ubuntu 26.04, clang 21, CMake 4.2, podman): checkout `~/doa4-360-recomp`, cloned
+  from the Windows checkout (its `origin`), with `port/assets` a link to the Windows checkout's;
+  SDK in its `third_party/rexglue-sdk-bd833a2`; logs in `~/doa4-logs`. GRAW's and DOAX2's Linux
+  SDKs are other trees (GRAW's host 379fa50, its Deck f481d5e; DOAX2's fc48868), so DOA4 has its
+  own. The `doa4-deck-build` image is the same Containerfile as the existing `doax2-deck-build`,
+  so podman's layer cache should make it quick.
+
+### Linux run 1 (2026-10-29, WSL2, RelWithDebInfo; `~/doa4-logs/run1.log`)
+The user's OK. llvmpipe (software Vulkan: WSL2 shows no GPU to Vulkan here), 720p
+(`--resolution_scale=1`), windowed, `tools/autopilot/boot.txt`, 240 s then SIGINT:
+```
+cd port/out/build/linux-amd64-relwithdebinfo
+./doa4 --no-fullscreen --resolution 720p --resolution_scale=1 --game_data_root <repo>/port/assets \
+  --user_data_root <repo>/port/user-linux --cache_root <repo>/port/cache-linux \
+  --log_file ~/doa4-logs/run1.log --log_flush_interval 1 --log_level debug \
+  --doa4_autopilot=<repo>/tools/autopilot/boot.txt
+```
+- **Boots natively to the title screen**: the warning screens and the logo at 60 fps, then the 3D
+  title (the cherry-blossom stage, PRESS START) at 1.3-2.3 fps, llvmpipe's limit (DOAX2 had
+  1-2 fps on it). The runtime's "Select a Device" save prompt came up after the autopilot's
+  last A press (60 s), so it stayed open; no profile or save was written.
+- No crash and no new errors: the 17 `ResolvePath(cache:\)` errors and the STFS stubs match the
+  Windows logs (the game probes the 360's cache partition for its AFS files). Audio runs through
+  SDL; the game's fibers are created and deleted; the low-memory reservation is logged. SIGINT
+  shut it down cleanly ("Title terminated; hard-exiting process").
+- PipeWire printed a missing `client.conf` on stdout (WSLg has no PipeWire config); harmless.
+- The dialog font gap above.
 
 ## Next steps
-1. **Linux stream, with the user's OK for each build:** a DOA4 checkout in WSL2 on the Linux file
-   system (branch `linux-native`, `port/assets` linked to the Windows one); `tools/setup-linux.sh`
-   then `tools/build-linux.sh` and a first native run (WSL's GPU or llvmpipe); then
-   `tools/build-deck.sh` (RelWithDebInfo and Release) and `tools/steamdeck/make_linux_package.sh
-   --deck deck@steamdeck --with-game`; the user's Deck run at 720p (PLAN.md M5: 60 fps in a
-   2-character fight or a measured list of what stops it).
+1. **Linux stream, with the user's OK for each build:** done in WSL2: the SDK, the build and
+   Linux run 1 (boots to the title). Next: rebuild with the dialog-font fix (`git pull` in
+   `~/doa4-360-recomp`, then `tools/build-linux.sh`); `tools/build-deck.sh` (RelWithDebInfo and
+   Release) and `tools/steamdeck/make_linux_package.sh --deck deck@steamdeck --with-game`; the
+   user's Deck run at 720p (PLAN.md M5: 60 fps in a 2-character fight or a measured list of what
+   stops it). The Deck run also shows the font at 1280x800.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
