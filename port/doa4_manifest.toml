@@ -145,6 +145,48 @@ name = "Doa4FrameMark"
 address = 0x8275B0BC
 registers = []
 
+
+# Keep FP exceptions masked (src/fpscr_guard.cpp, from graw360-recomp and quake4-360-recomp). The
+# first smoke run (2026-10-29, smoke-20261029-063237.log) died 12 s in with C000008F on the audio
+# worker, MXCSR 0x8060 (every exception unmasked), in sub_8297D748 under the worker's callback
+# sub_82968368: the runtime never seeds that context. One hook at the callback's entry and one
+# before each of the image's six mtfsf (0x82794140 is generated twice: the fiber routine has two
+# entries).
+[[entrypoint.midasm_hook]]   # the audio worker's callback (the game's mixer), entered on an unseeded context
+name = "Doa4GuardFpscr"
+address = 0x82968368
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf in the fiber context save/load (sub_82793F70 / sub_82793F80)
+name = "Doa4GuardFpscr"
+address = 0x82794140
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf in the C runtime's floating-point environment functions
+name = "Doa4GuardFpscr"
+address = 0x82A07EF8
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf, C runtime
+name = "Doa4GuardFpscr"
+address = 0x82A07F2C
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf, C runtime
+name = "Doa4GuardFpscr"
+address = 0x82A07F4C
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf, C runtime
+name = "Doa4GuardFpscr"
+address = 0x82A07F5C
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf in sub_82A1339C
+name = "Doa4GuardFpscr"
+address = 0x82A1343C
+registers = []
+
 # XAPI's fibers, bound before the first run (DOAX2 crashed 2 s in without them: translated code
 # can't switch stacks). Identified 2026-10-29 from the code, the same layout as DOAX2's XAPI and the
 # SDK's X_FIBER_CONTEXT: ConvertThreadToFiber fails with 1280 (ERROR_ALREADY_FIBER), allocates

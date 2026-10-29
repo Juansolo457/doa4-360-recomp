@@ -6,8 +6,28 @@ state, the build/run detail and where things live. Update it at the end of every
 next model starts here, not from chat history.
 
 ## Where it stands
-**M0 done (2026-10-29): `doa4.exe` builds clean; it has never been run.** The first run needs
-the user's OK (it opens a window on their screen).
+**M1 started (2026-10-29): the first run draws the warning screen, then dies on the audio
+worker's FP state; the fix is in the manifest, not yet built.** M0 is done (below).
+
+### Run 1 (2026-10-29, the user's OK; `port/logs/smoke-20261029-063237.log`)
+Captures in `private/captures/doa4-20261029-063237/`.
+- **Vulkan works:** RTX 4090, the Xenos plugin's Vulkan backend, presents from +0.15 s at
+  1280x720; `readback_resolve` 'none'. The Xbox Series X pad connects as player 1.
+- **The fiber hooks work:** ConvertThreadToFiber on the main thread, then CreateFiber (start
+  0x824F3310, 32 KB stack). No "unregistered function".
+- **On screen:** the game's copyright / FEDERAL WARNING text, crisp and correct (+10 s).
+- **Crash at +12.2 s:** C000008F (inexact) on the audio worker in `sub_8297D748`, under the
+  worker's callback `sub_82968368`, MXCSR 0x8060: every FP exception unmasked
+  (`crash-20261029-063249.txt`). The same as Quake 4's and GRAW's first boots: the runtime never
+  seeds the audio worker's context.
+- **Fix (manifest, not yet built):** `Doa4GuardFpscr` hooked at the callback's entry and before
+  each of the image's six `mtfsf` (`src/fpscr_guard.cpp`, as Quake 4).
+- Noise, none fatal: `D:\DOA4\` opens fail (devkit path); **`cache:\chrone.afs` probes** (52
+  `cache:` lines): the game looks for a cached copy of its character archive on the cache
+  partition (StfsCreateDevice is a stub, so there is none) and should fall back to the disc;
+  watch for load-time cost later. `IoDismountVolumeByFileHandle` stub, devkit-memory warning.
+
+### M0 (2026-10-29): `doa4.exe` builds clean
 
 `port/out/build/win-amd64-relwithdebinfo/doa4.exe` (52 MB) with `rexgpu-xenosrd.dll` and
 `rexruntimerd.dll` beside it, byte-identical to the Vulkan-only install's (SHA-256 checked). The
@@ -60,11 +80,9 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **First smoke run** (`tools/smoke.ps1 -Seconds 60 -CaptureEvery 5`, headless; the user's OK
-   first): expect the warning screen, the Sofdec intro, the title. Watch for "Call to invalid or
-   unregistered function" (a missed entry: the next manifest round), fiber activity
-   (ConvertThreadToFiber / CreateFiber), FPSCR faults on the audio worker (`fpscr_guard.cpp` is
-   linked but not hooked), and the frame log ("DOA4 frames: ..." every 10 s from `Doa4FrameMark`).
+1. **Rebuild with the FPSCR hooks and rerun the 60 s smoke test** (both need the user's OK):
+   expect the warning screen, the Sofdec intro, the title; the frame log ("DOA4 frames: ..."
+   every 10 s from `Doa4FrameMark`, which run 1 died before reaching).
 2. Then `tools/autopilot/boot.txt` with the real timings, into the main menu (M1).
 3. An upstream issue for the halfword-index switch bug; LOTR's `find_vcall_thunks.py` rerun.
 4. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
