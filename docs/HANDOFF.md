@@ -19,8 +19,12 @@ next model starts here, not from chat history.
 - `port/doa4_manifest.toml` is the bare scaffold: **no function hints, no `setjmp`/`longjmp`,
   no fiber hooks, no `Doa4FrameMark` hook yet** (its comment lists what to find).
   `src/frame_timing.cpp` compiles but is never called until the VdSwap `midasm_hook` exists.
-- **Not done:** codegen and the first build (need the user's OK), the GitHub repository, the
-  branch lock, CodeRabbit's enablement. See "Next steps".
+- GitHub: https://github.com/Juansolo457/doa4-360-recomp, **public**, created 2026-10-29 with
+  the bootstrap commit on `master`; `master` locked as the sister repos (PR only, `audit`
+  required and strict, conversations resolved, admins included, no force push or delete); merge
+  commits kept, branches deleted on merge. The first `audit` run passed. CodeRabbit covers the
+  repo (the account's GitHub App installation lists it); PR #1 is its first review here.
+- **Not done:** codegen and the first build (need the user's OK). See "Next steps".
 
 ## Next steps
 1. **Codegen round 1** (`tools/build.ps1`, with the user's OK): expect `b` targets "not in any
@@ -34,7 +38,7 @@ next model starts here, not from chat history.
 3. **First smoke run** (`tools/smoke.ps1 -Seconds 60 -CaptureEvery 5`, headless, the user's OK):
    expect the warning screen, the Sofdec intro, the title. Then `tools/autopilot/boot.txt` with
    the real timings filled in.
-4. Commit M0 on a branch, open the PR, let CodeRabbit review, merge.
+4. Every later change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
 
 ## How it is built and run
 ```
