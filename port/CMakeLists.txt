@@ -27,6 +27,7 @@ set(DOA4_SOURCES
     src/frame_timing.cpp
     src/cpu_check.cpp
     src/fpscr_guard.cpp
+    src/id_table_probe.cpp
 )
 
 # The CPU check runs before any x86-64-v3 code (src/cpu_check.cpp), so it is built for v2 and

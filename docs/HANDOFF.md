@@ -6,8 +6,32 @@ state, the build/run detail and where things live. Update it at the end of every
 next model starts here, not from chat history.
 
 ## Where it stands
-**M1 started (2026-10-29): the first run draws the warning screen, then dies on the audio
-worker's FP state; the fix is in the manifest, not yet built.** M0 is done (below).
+**M1 nearly there (2026-10-29): run 2 reaches the main menus, Sparring and character select at
+the game's 60 fps, then crashes on the Now Loading screen into the first fight.** A probe for that
+crash is in the manifest, not yet built. M0 is done (below).
+
+### Run 2 (2026-10-29, FPSCR hooks built; `port/logs/smoke-20261029-063849.log`)
+Captures in `private/captures/doa4-20261029-063849/`, contact sheet `private/captures/run2-sheet.png`.
+- **The FP crash is fixed:** no C000008F; the audio worker runs.
+- **On screen, all drawn correctly:** the storm-sea intro (+10 s), clouds (+15 s), the sunrise
+  over the peaks (+20 s), the **Mode Select** menu over the shrine stage with the mode icons
+  and help text (+30-35 s), **Sparring character select** with the roster, Hayabusa and
+  Christie in 3D (+40-50 s), then **Now Loading** (+55 s). No autopilot ran: the menu choices
+  came from the connected Xbox Series X pad.
+- **The game's own frame rate** (`Doa4FrameMark`): 60.0-60.3 fps, median 16.6-16.7 ms in every
+  10 s window; three single long frames (1.2 s, 1.2 s, 0.54 s) at loads.
+- **Crash at +58 s** on the main thread, on Now Loading: access violation reading guest
+  0x42C80000 in `sub_82372840` (`crash-20261029-063947.txt`; stack: `sub_82371DC0`,
+  `sub_8234F030`, `sub_82354DB0`, `sub_824F4878`, `sub_824F41E0`, `xstart`). 0x42C80000 is
+  100.0f used as a pointer. The function takes a per-player object (580 bytes each at
+  0x8302BC98), reads an ID from its field 4 and looks it up in `{count, array}` tables at
+  0x82CE86F8 (IDs below 0x2000 and from 0x3000) or 0x82CE88F0 (0x2000-0x2FFF, index ID-0x2000),
+  then loads two pointers from the entry. In the image both tables are 8 and 10 valid pointers,
+  with no 100.0 just before either array; 100.0 words sit about 120 slots before, in
+  neighbouring tables. The bound check is a signed compare, so a negative or wrong ID would read
+  there; the other reading is that something overwrote the table at run time. Unproven.
+- **Probe (built next):** `src/id_table_probe.cpp`, a midasm hook just after the entry load
+  (0x823729BC), logs every non-pointer entry with the ID, index, count, array and player slot.
 
 ### Run 1 (2026-10-29, the user's OK; `port/logs/smoke-20261029-063237.log`)
 Captures in `private/captures/doa4-20261029-063237/`.
@@ -80,10 +104,11 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Rebuild with the FPSCR hooks and rerun the 60 s smoke test** (both need the user's OK):
-   expect the warning screen, the Sofdec intro, the title; the frame log ("DOA4 frames: ..."
-   every 10 s from `Doa4FrameMark`, which run 1 died before reaching).
-2. Then `tools/autopilot/boot.txt` with the real timings, into the main menu (M1).
+1. **Rebuild with the ID-table probe and rerun into a fight** (both need the user's OK): the
+   probe's log line says whether the ID is out of range or the table was overwritten. Then the
+   fix (an ID source bug, or a write that hits the table), and the probe comes out.
+2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
+   captures, so a fight can be reached without a person at the pad.
 3. An upstream issue for the halfword-index switch bug; LOTR's `find_vcall_thunks.py` rerun.
 4. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
 

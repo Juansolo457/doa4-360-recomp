@@ -22,8 +22,8 @@ Steam Deck, both on Vulkan.
 
 ## Status
 
-The game's code translates and builds clean on Windows (2026-10-29); the first run is next. See
-[docs/HANDOFF.md](docs/HANDOFF.md).
+Boots on Windows (2026-10-29): intro, Mode Select and character select draw correctly at the
+game's 60 fps. Loading into a fight still crashes. See [docs/HANDOFF.md](docs/HANDOFF.md).
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones, lessons from the sister projects
 - [docs/HANDOFF.md](docs/HANDOFF.md): current state, how things work, where things live

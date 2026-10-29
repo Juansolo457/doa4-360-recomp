@@ -187,6 +187,14 @@ name = "Doa4GuardFpscr"
 address = 0x82A1343C
 registers = []
 
+
+# Diagnostic for run 2's crash (src/id_table_probe.cpp): just after the entry load in
+# sub_82372840's ID table lookup. Remove once the cause is known.
+[[entrypoint.midasm_hook]]
+name = "Doa4ProbeIdTable"
+address = 0x823729BC
+registers = ["r4", "r5", "r6", "r8", "r11", "r28"]
+
 # XAPI's fibers, bound before the first run (DOAX2 crashed 2 s in without them: translated code
 # can't switch stacks). Identified 2026-10-29 from the code, the same layout as DOAX2's XAPI and the
 # SDK's X_FIBER_CONTEXT: ConvertThreadToFiber fails with 1280 (ERROR_ALREADY_FIBER), allocates
