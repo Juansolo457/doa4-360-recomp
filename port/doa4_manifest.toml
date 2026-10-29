@@ -202,6 +202,13 @@ name = "Doa4ProbeIdSource"
 address = 0x82372CB0
 registers = ["r1", "r3", "r4", "r5", "r6"]
 
+# Diagnostic for run 5's finding: the motion-script interpreter's dispatch in sub_8240CE58
+# (r4 = stream, r11 = opcode, r29 = player). Feeds Doa4ProbeIdSource's dump.
+[[entrypoint.midasm_hook]]
+name = "Doa4ProbeScriptOp"
+address = 0x8240D390
+registers = ["r4", "r11", "r29"]
+
 # XAPI's fibers, bound before the first run (DOAX2 crashed 2 s in without them: translated code
 # can't switch stacks). Identified 2026-10-29 from the code, the same layout as DOAX2's XAPI and the
 # SDK's X_FIBER_CONTEXT: ConvertThreadToFiber fails with 1280 (ERROR_ALREADY_FIBER), allocates

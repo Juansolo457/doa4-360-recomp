@@ -48,6 +48,28 @@ uint32_t LoadGuestU32(uint32_t address) {
 }
 }  // namespace
 
+// Run 5 (2026-10-29) named the call site: lr 0x8240DB64, opcode 20 of the motion-script
+// interpreter in sub_8240CE58, whose operand halfword is 0xFF00 in Ryu Hayabusa's script.
+// Doa4ProbeScriptOp runs at the dispatch (0x8240D390: r4 = stream pointer, r11 = opcode, r29 =
+// player) and keeps each player's last 32 dispatches, dumped with the stream bytes when a
+// negative ID appears, to tell real data from an interpreter that fell out of step.
+namespace {
+struct ScriptRing {
+  uint32_t ptr[32];
+  int32_t op[32];
+  uint32_t next;
+};
+ScriptRing g_rings[4];
+}  // namespace
+
+void Doa4ProbeScriptOp(PPCRegister& r4, PPCRegister& r11, PPCRegister& r29) {
+  if (r29.u32 >= 4) return;
+  ScriptRing& ring = g_rings[r29.u32];
+  const uint32_t slot = ring.next++ & 31;
+  ring.ptr[slot] = r4.u32;
+  ring.op[slot] = r11.s32;
+}
+
 void Doa4ProbeIdSource(PPCRegister& r1, PPCRegister& r3, PPCRegister& r4, PPCRegister& r5,
                        PPCRegister& r6) {
   if (r4.s32 >= 0) return;
@@ -57,4 +79,18 @@ void Doa4ProbeIdSource(PPCRegister& r1, PPCRegister& r3, PPCRegister& r4, PPCReg
       "DOA4 probe: negative id 0x{:08X} ({}) set from lr 0x{:08X}: r3 {} r5 {} r6 {}, "
       "caller 196(r1) 0x{:08X}",
       r4.u32, r4.s32, uint32_t(ctx.lr), r3.s32, r5.s32, r6.s32, LoadGuestU32(r1.u32 + 196));
+  if (r3.u32 >= 4) return;
+  const ScriptRing& ring = g_rings[r3.u32];
+  for (uint32_t i = 0; i < 32; ++i) {
+    const uint32_t slot = (ring.next + i) & 31;
+    if (!ring.ptr[slot]) continue;
+    REXLOG_ERROR("DOA4 probe: player {} op {:3} ({:#06x}) at 0x{:08X}", r3.u32, ring.op[slot],
+                 uint32_t(ring.op[slot]) & 0xFFFF, ring.ptr[slot]);
+  }
+  const uint32_t last = ring.ptr[(ring.next - 1) & 31];
+  for (uint32_t row = 0; row < 6; ++row) {
+    const uint32_t a = last - 64 + row * 16;
+    REXLOG_ERROR("DOA4 probe: stream 0x{:08X}: {:08X} {:08X} {:08X} {:08X}", a, LoadGuestU32(a),
+                 LoadGuestU32(a + 4), LoadGuestU32(a + 8), LoadGuestU32(a + 12));
+  }
 }

@@ -11,6 +11,23 @@ the game's 60 fps, then crash loading a fight with Ryu Hayabusa; run 4 played a 
 the cause is an out-of-range ID (-256); a second probe for where it comes from is in the
 manifest, not yet built. M0 is done (below).
 
+### Run 5 (2026-10-29, Ryu as player 1, 180 s; `port/logs/smoke-20261029-082927.log`)
+Same crash (`crash-20261029-083044.txt`). **The call-site probe named the source:** lr
+0x8240DB64, opcode 20 of the motion-script interpreter in `sub_8240CE58` (dispatch at
+0x8240D390, a 160-entry jump table at 0x8240D3BC that the generated switch matches entry for
+entry). Opcode 20 reads the halfword after it from the player's script stream and passes it,
+sign-extended, as the ID: 0xFF00, so -256.
+- **The original does the same lookup** (signed bound check, then `lwz` through the entry), so on
+  the console this would read 0x42C80000 too. That address is in the 64K-page heap, which only
+  `X_MEM_LARGE_PAGES` allocations fill; nothing in our logs lives there.
+- **The byte pattern `00 14 FF 00` is common:** 362 hits in `mot.afs`, in every character's
+  motion files, Kasumi's included (run 4 played fine). So a raw search can't tell real data from
+  an interpreter that fell out of step with the stream.
+- **Third probe (not built):** `Doa4ProbeScriptOp` at the dispatch keeps each player's last 32
+  (pointer, opcode) pairs; `Doa4ProbeIdSource` dumps them and 96 bytes of the stream when a
+  negative ID appears. Then find those bytes in `ryu.mot` (entry 13) or `m_ryu.mot` (14) and
+  check whether the opcode boundaries line up.
+
 ### Run 4 (2026-10-29, call-site probe built; `port/logs/smoke-20261029-082038.log`)
 **A full fight plays.** The user chose Watch mode with Kasumi and a random stage: the cherry
 blossom bridge and the river stage, both fighters, health bars and hits, all drawn correctly at
@@ -129,9 +146,11 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Rerun with Ryu Hayabusa as player 1, 180 s** (needs the user's OK; the call-site probe is
-   built): its log line names the call site that passes -256 and, for `sub_8240CE58`, the halfword array. Then
-   trace that halfword to its file or writer, fix the cause, and take both probes out.
+1. **Rebuild with the script-dispatch probe and rerun with Ryu as player 1, 180 s** (needs the
+   user's OK): the dump shows the opcodes before the bad one. If the stream is out of step, find
+   the handler that consumed the wrong number of bytes (a translation bug); if it lines up with
+   `ryu.mot`, the console must have 0x42C80000 mapped, so look at the game's allocations. Then
+   fix it and take all three probes out.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
 3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
