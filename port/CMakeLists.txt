@@ -28,6 +28,7 @@ set(DOA4_SOURCES
     src/cpu_check.cpp
     src/fpscr_guard.cpp
     src/anim_id_guard.cpp
+    src/anim_trace.cpp
 )
 
 # The CPU check runs before any x86-64-v3 code (src/cpu_check.cpp), so it is built for v2 and

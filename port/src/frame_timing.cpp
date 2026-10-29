@@ -155,7 +155,11 @@ void Doa4RequestRenderDocCapture() {
   REXLOG_INFO("DOA4: RenderDoc capture requested (hotkey)");
 }
 
+// Game frame number, for diagnostics that stamp their log lines (src/anim_trace.cpp).
+std::atomic<uint32_t> g_doa4_frame_number{0};
+
 void Doa4FrameMark() {
+  g_doa4_frame_number.fetch_add(1, std::memory_order_relaxed);
   const Clock::time_point now = Clock::now();
   std::lock_guard<std::mutex> lock(g_mutex);
   MaybeTriggerCapture(now);

@@ -22,9 +22,20 @@ back to the title screen (the game was closed there, `TerminateTitle`, no crash 
   about 1.5 s), then comes back cut off at the shoulders and slides down.
 - **The guard is probably not the cause:** the table it guards looks like facial expressions
   (the same function picks a random entry about every 60 frames, like idle blinking). Not proven.
-- **Next:** timestamps from the user of what looks wrong, and a reference of the real game's
-  select screen and Ryu fight; then compare against Kasumi (run 4) to tell a Ryu-only fault from
-  a general animation one (bone blending, VMX128 maths).
+- **The user picked the select screen as the clearest case.** Compared with the real game (a
+  Series X backwards-compatibility video and a story-mode walkthrough on YouTube): there,
+  hovering Ryu shows the face close-up for about 0.8 s, then cuts to a full-body shot, a pose with
+  a vanish, then the upper body with the sword, all in frame. In the port the face close-up holds
+  about 3 s and the camera never cuts: the model keeps animating inside the close-up framing, so
+  the head turns and rises out of the panel, the panel is empty about 1.5 s, and the body comes
+  back cut off at the shoulders. **Hayate's sequence in the port is right** (face, full body,
+  jump, pose, upper body), so the fault follows Ryu's data.
+- **Not the guard:** it logs its first 4 drops, at 09:19:36, 09:19:49, 09:21:02 and 09:21:13, all
+  in fights; the select-screen hover was at about 09:20:23.
+- **Trace (not built):** `src/anim_trace.cpp` logs, per game frame, each player's motion-script
+  starts (with their first bytes), every animation-ID request (`sub_82373680`, `sub_82372D78`),
+  the consumer's gate bytes, and every request applied or dropped as stale. Run: hover Ryu on the
+  left panel about 8 s without pressing A, then Hayate about 8 s, then Kasumi, then pick Ryu.
 
 ### Run 6 (2026-10-29, script-dispatch probe, Ryu as player 1; `port/logs/smoke-20261029-085747.log`)
 Same crash. **The dump settled it:** the stream the interpreter ran is Ryu's `ryu.bin` from
@@ -175,9 +186,9 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Ryu's animation fault** (run 7): get the user's timestamps and a reference of the real
-   game, find whether it is Ryu-only or general, then trace it (motion data, bone blending,
-   vector maths). Each build and run needs the user's OK.
+1. **Ryu's select-screen fault** (run 7): build the trace and run the hover sequence above (needs
+   the user's OK), compare Ryu's requests and script starts with Hayate's, then fix and remove
+   the trace.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
 3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
