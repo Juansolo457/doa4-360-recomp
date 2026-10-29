@@ -5,8 +5,8 @@ translated from your copy of the Xbox 360 disc on your own PC, and the game data
 same disc. You need your own disc of **Dead or Alive 4** for the Xbox 360, the USA/Europe
 Rev 1 release (see step 3).
 
-> Early days: the first translation and build are next. See [HANDOFF.md](HANDOFF.md) for
-> where it stands.
+> Work in progress: the game builds and plays on Windows (menus and full fights). Other modes
+> are still being checked. See [HANDOFF.md](HANDOFF.md) for where it stands.
 
 The first setup takes about an hour, most of it compiling the ReXGlue SDK. After that, rebuilds
 take a few minutes.
@@ -72,7 +72,7 @@ pwsh -NoProfile -File tools/launch.ps1 -Windowed
 
 | Option | Effect |
 |---|---|
-| `-Scale 1..3` | internal resolution: 1 = 1280×720 (the console's, default), 2 = 2560×1440, 3 = 3840×2160 |
+| `-Scale 1..3` | internal resolution: 1 = 1280×720 (the console's), 2 = 2560×1440 (default), 3 = 3840×2160 |
 | `-Windowed` | a window instead of full screen |
 | `-Trace` | every kernel call in the log |
 
@@ -80,4 +80,5 @@ Saves stay in `port/user`, logs in `port/logs`. A crash writes `crash-<time>.txt
 
 ## Linux and the Steam Deck
 
-Not yet: the native Linux build comes after Windows ([PLAN.md](PLAN.md), M5).
+Not yet: the native Linux build comes after the Windows work is reviewed and merged
+([PLAN.md](PLAN.md), M5). On the Deck it will default to 720p.

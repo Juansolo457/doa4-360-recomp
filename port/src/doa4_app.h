@@ -33,6 +33,8 @@ void Doa4RequestRenderDocCapture();  // frame_timing.cpp
 // The runtime signs in only player 1 and gives controllers player slots in connection order. A
 // virtual XInput device (Logitech's, Steam Input's) can take slot 0 and leave the real pad as an
 // unsigned player 2, so by default every controller and the keyboard drive player 1.
+void Doa4ReserveLowMemory();
+
 REXCVAR_DEFINE_BOOL(doa4_shared_controllers, true, "DOA4",
                     "Every connected controller (and the keyboard) drives player 1, the "
                     "signed-in profile; off = one controller per player slot")
@@ -103,6 +105,9 @@ class Doa4App : public rex::ReXApp {
       };
     }
   }
+
+  // Before the game's first instruction: keep low guest memory free (src/low_memory.cpp).
+  void OnPreLaunchModule() override { Doa4ReserveLowMemory(); }
 
   void OnPostSetup() override {
     if (auto* w = window()) w->SetTitle("Dead or Alive 4 (Xbox 360)");

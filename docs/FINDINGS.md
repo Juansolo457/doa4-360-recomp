@@ -83,6 +83,67 @@ nothing on the boot path. Notable imports: the full XMA context set (hardware au
   XHV voice, achievements ("Let's play DEAD OR ALIVE 4 and get this Achievement!").
 - No Bink, Wwise, Havok, Scaleform or Lua.
 
+### Translation facts (ReXGlue `bd833a2`, 2026-10-29)
+- `.pdata` lists **15,073 functions** (0x822F0000 to 0x82B63E80). The code generator needed 3
+  tail-call targets, the fiber context routine and 92 finder candidates on top (the manifest).
+- **XAPI fibers**, the same code as DOAX2's XAPI (2640-byte context at KTHREAD+0x164):
+  `ConvertThreadToFiber` 0x827923C0 (fails with 1280), `ConvertFiberToThread` 0x82792450 (fails
+  with 1281), `CreateFiber` 0x827924A0, `DeleteFiber` 0x82792588 (converts back first when the
+  fiber is the current one), `SwitchToFiber` 0x827925E8 (a `b` to the register save/load at
+  0x82793F80: `mfcr`, LR, `std r14..` into the current context, then the next one's).
+- **setjmp** 0x82A04560 and **longjmp** 0x82A04220: the MS CRT pair (f14-f31 at 0, r1 at 144,
+  r13 onward from 152 as `std`), the same code as DOAX2's 0x829F12D0 / 0x829F1080 apart from
+  addresses. Called from three translation units.
+- **VdSwap** (xboxkrnl ordinal 603, thunk 0x82B5E81C) is called from one place, the `bl` at
+  0x8275B0BC: the frame hook.
+
+### Switches (`tools/check_switch_tables.py`, 826 in all)
+- **Code generator bug:** `sub_8251D328` (bctr 0x8251D3F4) and `sub_8251DA10` (bctr 0x8251DC0C)
+  compute the index as `lhzx r10,r11,rN; extsh r11,r10; cmplwi r11,N`, after `rlwinm r11,r3,1`
+  built the table offset from r3. The generated `switch` reads **r3**, not r11. Overridden in
+  the manifest with register 11 and the image's own labels.
+- Benign, checked by disassembly: `sub_824AF148`, `sub_824AF790` and `sub_824AFE60` have 8-entry
+  tables whose entries 2 and 6 point at the zero padding word after the function (an index the
+  console can't take either); in `sub_822F3178` index 4 branches away before the table; in
+  `sub_824BF230` two tables sit back to back and the checker pairs the second table with the
+  first's register.
+- `tools/find_vcall_thunks.py` matches at 0x82450C78 and 0x82450CA0 are not forwarders of their
+  own: each is the second half of a null-checking wrapper (`sub_82450C60`, `sub_82450C88`: return
+  E_POINTER 0x80004003 if the object is null, else jump through vtable slot 12 / 16), already
+  registered.
+
+### The negative animation ID (runs 2-6, superseded by run 9)
+Runs 2-6 crashed loading a fight with Ryu Hayabusa: opcode 20 of the motion-script interpreter
+passed the ID 0xFF00 (-256), `sub_82372840` indexed its 8-entry table at 0x82CE86F8 with a signed
+bound check only, read the float 100.0 (0x42C80000) 1 KB before it and loaded through it. The
+bytes were Ryu's `ryu.bin`, but **not his scripts**: they were section 8's records, run as a
+script because his script table was never relocated (below). Run 7's guard (drop negative IDs)
+stopped the crash but not the cause, and was removed once run 9 fixed the cause; with correct
+scripts no -256 ID appears. The earlier reading, an original-game bug the console's memory hides,
+was wrong.
+
+### Ryu Hayabusa's unrelocated scripts (run 8, 2026-10-29)
+The likely root of every Ryu fault (the -256 ID, the select-screen warp, an AI that never attacks).
+- **How a motion's events are found:** `sub_8240AFB8` (motion start) takes the player's motion
+  (`lhz 48`), keeps the low 10 bits, and loads the script pointer from a 1024-entry table: for
+  motions below 0x2000 the character's own, `*(0x830AD870 + 132*char + 84)`, that is anm header
+  section 21; the stream pointers live at 0x830BB60C + 4*slot. `sub_8240CCE8` runs them each
+  frame (opcode 1 = wait for motion frame N), calling the interpreter `sub_8240CE58`.
+- **Section 21** of each `<character>.bin` starts with that table of 1024 file offsets (Ryu's:
+  0x10598, 0x105D8, ...; Kasumi's 0xE6A8, ...), followed by the scripts.
+- **In the port Ryu's table stays raw:** his `ryu.bin` is loaded at guest 0x10000 (the 4K heap's
+  first page), and run 8's trace shows slot 0 starting scripts at 0x105D8, 0x1090C, 0x10968 and
+  eight more raw table entries (11 of 31 starts match with base 0), so the interpreter runs file
+  offsets 0x5D8 onwards: header and record data. Run 6's stream (0x160B0, file offset 0x60B0) is
+  inside section 8's 16-byte records.
+- **Why only Ryu, likely:** a relocation that skips values that already look like pointers (at
+  or above the base). With the base at 0x10000 Ryu's offsets 0x10598-0x21348 do; other files
+  load higher. The check itself is not yet found in the code.
+- **Fixed (run 9):** `src/low_memory.cpp` reserves guest 0x10000-0x1000000 before the game starts,
+  so nothing loads that low, as on the console. Ryu's scripts then start at 0x0101xxxx with real
+  opcodes, his select sequence matches the real game (face, full body, upper body with the
+  sword), and he fights and scores.
+
 ### Emulator state
 Xenia Canary [game-compatibility #207](https://github.com/xenia-canary/game-compatibility/issues/207):
 `state-playable`. No published static recompilation of this title was found (2026-10-29).

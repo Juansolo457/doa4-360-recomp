@@ -22,8 +22,10 @@ Steam Deck, both on Vulkan.
 
 ## Status
 
-Bootstrapped 2026-10-29: repository, toolchain, Vulkan-only SDK and the disc tools are in place;
-the first translation and build are next. See [docs/HANDOFF.md](docs/HANDOFF.md).
+Plays on Windows (2026-10-29): intro, menus, character select and full fights, Ryu Hayabusa
+included. The game held its 60 fps in the runs tested so far, at 720p internal and in one
+Sparring match at 4K (`-Scale 3`). The launcher's default is 1440p (`-Scale 2`), not yet
+measured. See [docs/HANDOFF.md](docs/HANDOFF.md).
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones, lessons from the sister projects
 - [docs/HANDOFF.md](docs/HANDOFF.md): current state, how things work, where things live

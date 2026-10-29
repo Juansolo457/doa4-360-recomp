@@ -5,15 +5,6 @@
 # in rounds, each with a comment saying where it came from (codegen warnings,
 # tools/find_missed_functions.py, tools/check_switch_tables.py, tools/find_vcall_thunks.py).
 # Fix missing functions here, never in the generated code.
-#
-# Still to find before the first build (docs/PLAN.md, "Lessons applied", M0):
-#  - setjmp_address / longjmp_address: the MS CRT pair (f14-f31 at 0, r1 at 144, r13.. from 152);
-#    libjpeg's error exit longjmps (DOAX2's photo-album crash);
-#  - [entrypoint.rexcrt]: the XAPI fiber routines, if this build uses fibers as DOAX2 does
-#    (ConvertThreadToFiber fails with 1280, ConvertFiberToThread with 1281, CreateFiber,
-#    SwitchToFiber, DeleteFiber);
-#  - [[entrypoint.midasm_hook]] Doa4FrameMark just before the game's VdSwap call
-#    (src/frame_timing.cpp).
 
 [project]
 name = "doa4"
@@ -24,6 +15,210 @@ game_root = "assets"
 file_path = "assets/default.xex"
 out_directory_path = "generated/default"
 includes = []
+# The C runtime's setjmp/longjmp (MS CRT layout: f14-f31 at 0, r1 at 144, r13.. from 152 as std).
+# Found 2026-10-29 by matching DOAX2's pair (sub_829F12D0 / sub_829F1080) over 24 instructions with
+# immediates and branch targets masked: one hit each. libjpeg's error exit longjmps out of a failed
+# decode (DOAX2's photo-album crash); named here, codegen emits ppc_setjmp/ppc_longjmp.
+setjmp_address = 0x82A04560
+longjmp_address = 0x82A04220
 
 [entrypoint.functions]
-# Round 1: after the first codegen run (not yet run; needs the user's OK).
+# Round 1 (2026-10-29): the first codegen run reported these as `b` targets "not in any
+# function". Each starts right after the previous function's last branch, with no .pdata entry;
+# checked by disassembly (private/xex/default.bin).
+0x8296EAC8 = {}   # zero-extends r4/r5 and compares them (2, 3) before a lookup; tail-called from 0x82977704
+0x82450CB0 = {}   # fills a static object at 0x833FEE30 (zeroes, flag 1, two 0x822A88xx pointers); tail-called from 0x82A393A0
+0x829CCF50 = {}   # loads 180(r3), returns if null, else jumps through a pointer at 0x82F76658; tail-called from 0x829C6B64
+
+# Round 2 (2026-10-29, second codegen): "Unresolved b target 0x82793F80 from 0x827925E8".
+# 0x827925E8 is SwitchToFiber's thunk; 0x82793F80 saves the current fiber's registers (mfcr, LR,
+# std r14.. into the context at KTHREAD+0x164) and loads the next one's. The analyser folded it
+# into the function before it, as in DOAX2's round 2 (its 0x82785670).
+0x82793F80 = {}   # b from 0x827925E8
+
+
+# Round 3 (2026-10-29): tools/find_missed_functions.py on the decrypted image after round 2: 96
+# candidates (method-table slots and addresses built in code at function boundaries), added
+# wholesale as in the sister repos. A candidate that splits a function shows up as an
+# 'Unresolved' codegen warning and gets dropped.
+# 0x82330258 dropped (round 3): built in code, after a bl; inside the function before it: "Unresolved conditional branch to 0x82330244 from 0x8233027C"
+0x8234FFF0 = {}  # built in code, after a bl
+0x8237F0A8 = {}  # from 0x82CAA05C
+0x823A7778 = {}  # from 0x82C79F60
+0x82406520 = {}  # built in code
+0x82450010 = {}  # built in code, after a bl
+0x82450C88 = {}  # built in code
+0x82480020 = {}  # built in code, after a bl
+0x824A4558 = {}  # from 0x82299138
+0x824A4580 = {}  # from 0x8229919C
+0x824B1E40 = {}  # built in code
+0x824B1E50 = {}  # built in code
+0x82550820 = {}  # from 0x8229B678
+0x82550830 = {}  # from 0x8229B608
+0x82568AE0 = {}  # from 0x8229B96C
+0x8257FDF0 = {}  # from 0x8229B91C
+0x8257FE00 = {}  # from 0x8229B928
+0x8257FE10 = {}  # from 0x8229B954
+0x8258FFF0 = {}  # built in code, after a bl
+0x825B4A68 = {}  # from 0x8229C278
+0x825B4A78 = {}  # from 0x8229C27C
+0x825B6858 = {}  # from 0x8229C848
+0x825D2068 = {}  # from 0x8229BCC0
+0x82600010 = {}  # built in code, after a bl
+0x82690010 = {}  # built in code, after a bl
+0x826E0008 = {}  # built in code, after a bl
+0x826F54A8 = {}  # from 0x822A0B80
+0x826FA330 = {}  # from 0x822A0EE8
+0x82780008 = {}  # built in code, after a bl
+0x82784C60 = {}  # from 0x822BB1C4
+0x82795DBC = {}  # from 0x822C6250
+0x82797524 = {}  # from 0x822C6298
+0x8279769C = {}  # from 0x822C62A8
+# 0x827D5708 dropped (round 3): from 0x822C62E8; inside the function at 0x827D56B4: two "Unresolved" warnings from 0x827D5A9C/0x827D5AB4
+0x827DE3C0 = {}  # built in code
+0x827F3F80 = {}  # from 0x82007FC0
+0x827F4128 = {}  # from 0x82008184
+0x827F4150 = {}  # from 0x82008188
+0x827F4178 = {}  # from 0x8200818C
+0x827F41A0 = {}  # from 0x82008190
+0x827F45D0 = {}  # from 0x820081C4
+0x827F45F0 = {}  # built in code
+0x827F4600 = {}  # built in code
+0x827F4610 = {}  # built in code
+0x827F4620 = {}  # built in code
+0x827F4630 = {}  # built in code
+0x827F4640 = {}  # built in code
+0x827F4650 = {}  # built in code
+0x827F4660 = {}  # built in code
+0x827F4670 = {}  # built in code
+0x827F4680 = {}  # built in code
+0x8287D928 = {}  # built in code
+0x8287D938 = {}  # built in code
+0x82884CA4 = {}  # from 0x822C6300
+0x828866C8 = {}  # from 0x822C6328
+0x8288671C = {}  # from 0x822C6318
+0x828868C4 = {}  # from 0x822C6350
+0x82886910 = {}  # from 0x822C6340
+0x8290C4D0 = {}  # from 0x8202AB6C
+0x82910008 = {}  # built in code, after a bl
+0x829105B0 = {}  # built in code, after a bl
+# 0x829400E8 dropped (round 3): built in code, after a bl; inside the function before it: "Unresolved conditional branch to 0x8294009C from 0x82940138"
+0x82946728 = {}  # from 0x8202FB40
+0x8296DC00 = {}  # from 0x82037F24
+0x8296E898 = {}  # from 0x82037F98
+0x8296E8A0 = {}  # from 0x82037F9C
+0x8296E8A8 = {}  # from 0x82037FA0
+0x829779A0 = {}  # from 0x8203902C
+0x829779A8 = {}  # from 0x82039030
+0x829779B0 = {}  # from 0x82039034
+0x829779B8 = {}  # from 0x820390B0
+0x829779C0 = {}  # from 0x820390B4
+0x829779C8 = {}  # from 0x82038FD0
+0x829779E8 = {}  # from 0x82038FEC
+0x829779F0 = {}  # from 0x820390D8
+0x82977A00 = {}  # from 0x820390E0
+0x82977A10 = {}  # from 0x820390E8
+0x8298D0E8 = {}  # from 0x8203B57C
+0x8299E8B0 = {}  # from 0x8203CA6C
+0x829C8D84 = {}  # from 0x822C6368
+0x829C8E1C = {}  # from 0x822C6380
+0x829C8EA0 = {}  # from 0x822C6398
+0x829C8F08 = {}  # from 0x822C63B0
+0x829E2788 = {}  # from 0x8204CE18
+0x82A06874 = {}  # from 0x822C64A8
+0x82A0E9A4 = {}  # from 0x822C6590
+0x82A0F730 = {}  # from 0x822C65F0
+# 0x82A0FC34 dropped (round 3): from 0x822C6628; inside the function at 0x82A0FBA8: "Unresolved b target" from 0x82A0FC50
+0x82A0FC54 = {}  # from 0x822C6630
+0x82A0FD9C = {}  # from 0x822C6650
+0x82A10108 = {}  # from 0x822C6668
+0x82A10248 = {}  # from 0x822C6680
+0x82A10920 = {}  # from 0x822C6698
+0x82A11268 = {}  # from 0x822C66E0
+0x82A134C4 = {}  # built in code, after a bl
+0x82B592E0 = {}  # from 0x82B70024
+
+# The game's own frame rate and the RenderDoc capture trigger (src/frame_timing.cpp): just before
+# its one call to VdSwap (xboxkrnl ordinal 603, thunk 0x82B5E81C), the bl at 0x8275B0BC.
+[[entrypoint.midasm_hook]]
+name = "Doa4FrameMark"
+address = 0x8275B0BC
+registers = []
+
+
+# Keep FP exceptions masked (src/fpscr_guard.cpp, from graw360-recomp and quake4-360-recomp). The
+# first smoke run (2026-10-29, smoke-20261029-063237.log) died 12 s in with C000008F on the audio
+# worker, MXCSR 0x8060 (every exception unmasked), in sub_8297D748 under the worker's callback
+# sub_82968368: the runtime never seeds that context. One hook at the callback's entry and one
+# before each of the image's six mtfsf (0x82794140 is generated twice: the fiber routine has two
+# entries). Evidence (round: after run 1, 2026-10-29): the callback address is the crash report's
+# stack; the six addresses are every instruction in .text and PSFD00 matching mtfsf (primary
+# opcode 63, extended opcode 711, mask 0xFC0007FE = 0xFC00058E), rescanned 2026-10-29 with the same
+# six results. Run 2 onwards: no C000008F, the audio worker runs.
+[[entrypoint.midasm_hook]]   # the audio worker's callback (the game's mixer), entered on an unseeded context
+name = "Doa4GuardFpscr"
+address = 0x82968368
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf in the fiber context save/load (sub_82793F70 / sub_82793F80)
+name = "Doa4GuardFpscr"
+address = 0x82794140
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf in the C runtime's floating-point environment functions
+name = "Doa4GuardFpscr"
+address = 0x82A07EF8
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf, C runtime
+name = "Doa4GuardFpscr"
+address = 0x82A07F2C
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf, C runtime
+name = "Doa4GuardFpscr"
+address = 0x82A07F4C
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf, C runtime
+name = "Doa4GuardFpscr"
+address = 0x82A07F5C
+registers = []
+
+[[entrypoint.midasm_hook]]   # mtfsf in sub_82A1339C
+name = "Doa4GuardFpscr"
+address = 0x82A1343C
+registers = []
+
+
+# XAPI's fibers, bound before the first run (DOAX2 crashed 2 s in without them: translated code
+# can't switch stacks). Identified 2026-10-29 from the code, the same layout as DOAX2's XAPI and the
+# SDK's X_FIBER_CONTEXT: ConvertThreadToFiber fails with 1280 (ERROR_ALREADY_FIBER), allocates
+# 2640 (0xA50) bytes and stores them at KTHREAD+0x164 (356); ConvertFiberToThread fails with 1281
+# and clears it; CreateFiber allocates the 2640-byte context; DeleteFiber converts back when the
+# fiber is the current one, then frees; SwitchToFiber is the thunk to 0x82793F80.
+[entrypoint.rexcrt]
+ConvertThreadToFiber = 0x827923C0
+ConvertFiberToThread = 0x82792450
+CreateFiber = 0x827924A0
+DeleteFiber = 0x82792588
+SwitchToFiber = 0x827925E8
+
+# Switch tables (2026-10-29, tools/check_switch_tables.py after round 2: 826 switches, 7 flagged).
+# Two are a code generator bug: the index is loaded as a halfword from a table and sign-extended
+# into r11 (lhzx r10; extsh r11,r10; cmplwi r11,N), and the generated switch reads r3, the value
+# the table offset was built from earlier. The labels are the image's own table entries.
+# The other five are benign, checked by disassembly: in sub_824AF148, sub_824AF790 and
+# sub_824AFE60 cases 2 and 6 point at the zero padding word after the function (the console would
+# fault there too, so those indices never occur); in sub_822F3178 index 4 branches away before the
+# table (cmplwi r31,4; beq); sub_824BF230 has two tables back to back and the checker pairs the
+# second with the first's register (the generated code uses the right one for each).
+[[entrypoint.switch_tables]]   # in sub_8251D328, table 0x8251D3F8, index r11 (codegen used r3)
+address = 0x8251D3F4
+register = 11
+labels = [0x8251D408, 0x8251D418, 0x8251D428, 0x8251D438]
+
+[[entrypoint.switch_tables]]   # in sub_8251DA10, table 0x8251DC10, index r11 (codegen used r3)
+address = 0x8251DC0C
+register = 11
+labels = [0x8251DC24, 0x8251DC38, 0x8251DC44, 0x8251DC50, 0x8251DC64]

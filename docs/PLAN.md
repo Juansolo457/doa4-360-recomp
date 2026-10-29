@@ -23,8 +23,7 @@ Order of work: **the PC (Windows) build first, native Linux after, both Vulkan o
   change through a PR, the `audit` check, an up-to-date branch, every review thread resolved,
   admins included. CodeRabbit gets a `.coderabbit.yaml` from day one (section "Review").
 - **PC first, Linux later.** The native Linux/Deck build is a milestone of its own (M5), after
-  the Windows build plays well. A Proton test package on the Deck may come earlier as a
-  cheap preview, as LOTR and DOAX2 did; it is not the Linux deliverable.
+  the Windows work is reviewed and merged (the user, 2026-10-29: no Proton package first).
 - **Source only.** No release ever carries translated game code, game files or keys. Players
   build from their own disc (SETUP.md). The repository is **public** from day one.
 - **No builds, codegen or game windows without the user's OK.** They test other games on this
@@ -81,8 +80,8 @@ XIME text input and libjpeg. There is no Bink, Wwise, Havok or Scaleform here.
 ## Milestones
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | **Repo, toolchain, first translation** | Repo on GitHub, locked, CodeRabbit on, `audit` green; the LOTR shape copied and renamed (`doa4`, `Doa4App`, `DOA4_XEX_KEY`, hashes); Vulkan-only SDK linked through the shared junction (tree `cf0b7a0`); disc extracted to `port/assets`; `FINDINGS.md` with the facts above and the XEX SHA-256; codegen clean: 0 wrong switch tables, no vpkd3d128 hazards, `find_missed_functions.py` at a fixed point, `find_vcall_thunks.py` 0; `doa4.exe` links. **No run yet** |
-| M1 | **Boots to the main menu** | Warning screen, Sofdec intro, title, main menu drawn on the Vulkan backend; a controller moves through it; sign-in and storage prompts answered (headless and by pad); crash reporter, hang report and frame log from the first run; reference captures of each screen |
+| M0 (done 2026-10-29) | **Repo, toolchain, first translation** | Repo on GitHub, locked, CodeRabbit on, `audit` green; the LOTR shape copied and renamed (`doa4`, `Doa4App`, `DOA4_XEX_KEY`, hashes); Vulkan-only SDK linked through the shared junction (tree `cf0b7a0`); disc extracted to `port/assets`; `FINDINGS.md` with the facts above and the XEX SHA-256; codegen clean: 0 wrong switch tables, no vpkd3d128 hazards, `find_missed_functions.py` at a fixed point, `find_vcall_thunks.py` with no actionable forwarders (its two matches, 0x82450C78 and 0x82450CA0, are known false positives, FINDINGS.md); `doa4.exe` links |
+| M1 (partly met 2026-10-29) | **Boots to the main menu** | Warning screen, Sofdec intro, title, main menu drawn on the Vulkan backend; a controller moves through it; sign-in and storage prompts answered (headless and by pad); crash reporter, hang report and frame log from the first run; reference captures of each screen. **Met** (HANDOFF runs 2-10): intro, title, menus on Vulkan, the pad through them, the crash reporter, the frame log from run 2. **Open:** sign-in and storage prompts, a hang report, reference captures of every screen |
 | M2 | **A fight plays** | Versus (2 local players or CPU) and one Story chapter from character select to the results screen with the ending movie; saves and the replay/Theater path work; the HUD, stage effects, shadows, water and cloth checked against console footage; first visual-bug pass |
 | M3 | **Windows playable** | Every offline mode start to finish; Live menus fail gracefully; **a steady 60 fps at the game's own pacing** (frame CSV: p99 under 20 ms at 720p on the user's PC); resolution scale 1-3 with correct UI; the user's play-test with a real pad and fighting-game input feel checked (no added input latency over the console's) |
 | M4 | **Source-only 0.1 release (Windows)** | SETUP.md verified by a clean-machine build (the `graw-setup-test` method); README, LICENSES, NOTICE; tag `v0.1.0`; the release checklist from F.E.A.R. |
@@ -192,6 +191,10 @@ Each milestone is at least one pull request. M0 and M1 may share one, as LOTR's 
 ## Settled in review (the user, 2026-10-29, Plannotator)
 - **Public repository** from day one: `Juansolo457/doa4-360-recomp`, locked master, source only.
 - **Ask before every build and run** (the default rule stands; no standing OK for this repo).
-- **A Proton test package on the Deck after M2** (a fight plays), before the native Linux build.
+- ~~A Proton test package on the Deck after M2~~ (superseded 2026-10-29, below).
+- **Two streams (the user, 2026-10-29):** Windows first, at **1440p internal by default**
+  (`tools/launch.ps1 -Scale 2`; 720p and 4K stay options). Once CodeRabbit has reviewed it and
+  the PR is merged, the **native Linux build for the Steam Deck** (M5, no Proton package
+  first), **720p by default** there.
 - Scope stays the offline game on this disc. Title updates, DLC costumes and Xbox Live play are
   not planned; revisit only if the user asks.

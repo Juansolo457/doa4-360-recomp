@@ -6,35 +6,236 @@ state, the build/run detail and where things live. Update it at the end of every
 next model starts here, not from chat history.
 
 ## Where it stands
-**M0 in progress (2026-10-29): bootstrapped, nothing translated or built yet.**
-- The repo is `../lotr-conquest-360-recomp`'s shape renamed (`lotrc` -> `doa4`, `LotrConquestApp`
-  -> `Doa4App`, `LOTRC_` cvars -> `DOA4_`, the XEX hash and title); LOTR's autopilot scripts
-  and game-specific docs were not copied. `tools/audit_repo.py` and `.gitignore` know DOA4's
-  formats (`.afs`, `.sfd`, `.xgs`, `.dic`, `.tpr`, `.mot`, `.ptc`; the MPEG program-stream
-  signature). `tools/test_audit_repo.py`: 4 passed.
-- The disc is extracted: `port/assets` (6.8 GB, 59 files), `default.xex` SHA-256 as in
-  FINDINGS.md. The decrypted image and import list were made in a scratch folder; redo them
-  into `private/xex/` with the `xexdump` line in FINDINGS.md when analysis starts.
-- `.coderabbit.yaml` written (from `../hunter-xbe-recomp`'s, with this repo's paths).
-- `port/doa4_manifest.toml` is the bare scaffold: **no function hints, no `setjmp`/`longjmp`,
-  no fiber hooks, no `Doa4FrameMark` hook yet** (its comment lists what to find).
-  `src/frame_timing.cpp` compiles but is never called until the VdSwap `midasm_hook` exists.
-- **Not done:** codegen and the first build (need the user's OK), the GitHub repository, the
-  branch lock, CodeRabbit's enablement. See "Next steps".
+**M1 reached, M2 close (2026-10-29): menus, character select and full fights play at 60 fps,
+every character tried so far, Ryu Hayabusa included since run 9** (his scripts were left
+unrelocated because his file loaded at guest 0x10000; `src/low_memory.cpp` keeps that range
+free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below).
+
+### Run 10 (2026-10-29, 4K internal: `--resolution_scale=3 --anisotropic_override=5`; `port/logs/smoke-20261029-104915.log`)
+First run of the build without the trace and guard, and the first at 4K: the renderer reports
+"draw-scale swap sizing: packet=1280x720, src_scaled=3840x2160" (and its standard "Vulkan draw
+resolution scaling is experimental" warning). The user played Sparring, Ryu against Leifang on
+the helipad. **60.0 fps in every 10 s window**, no crash, no new errors (only the known `cache:`
+and `StfsControlDevice` stubs). The captures (the 2560x1440 window, so 4K downsampled) are clean:
+sharp HUD text and move list, no seams or half-pixel lines on models or stage, menus and select
+screen correct. Two near-white frames fall on critical hits, most likely the game's hit flash;
+not compared against scale 1. Real 4K output needs fullscreen on a 4K display
+(`tools/launch.ps1 -Scale 3` without `-Windowed`).
+
+### Run 9 (2026-10-29, low-memory reservation; `port/logs/smoke-20261029-104238.log`)
+**Ryu Hayabusa is fixed.** "DOA4: reserved guest 0x00010000-0x01000000" at start; his scripts
+start at 0x0101xxxx with real opcodes (`0002 000A 005A ...`, where run 8 read record data);
+hovering him shows the face close-up, a cut to the full body, then the upper body with the sword,
+as in the real game; in Watch he scores (71, 141, 240, 406, where runs 7-8 stayed at 0); the user
+then played a match against Kasumi (story intro, rounds, KO, replays) and reported it "played
+great". The guard never fired. 60.0 fps in every 10 s window, the game's 1280x720 shown in a
+2560x1440 window. The trace and the guard are removed (FINDINGS.md corrects the -256 reading).
+
+### Run 8 (2026-10-29, animation trace; `port/logs/smoke-20261029-095748.log`)
+The user hovered Ryu, Kasumi, Hayate and others, then played Watch with Ryu against Kasumi, and
+recorded it (NVIDIA capture `Desktop 2026.10.29 - 09.58.46.07.mp4`, not in the repo).
+- **Ryu's select model warps:** it flattens to a vertical sliver and vanishes (recording 5.5-6 s
+  and 26 s); every other character holds a normal close-up. **In the fight Ryu never lands a hit**
+  (his score stays 0, Kasumi's reaches 180), as in run 7. The guard dropped -256 once.
+- **The trace found the cause (FINDINGS.md, "Ryu Hayabusa's unrelocated scripts"):** Ryu's motion
+  scripts are looked up in a table that was never relocated, so they run his file's header and
+  record data. His file sits at guest 0x10000.
+- **Experiment (not built):** `src/low_memory.cpp` reserves guest 0x10000-0x1000000 before the
+  game starts, so nothing loads that low (as on the console). The trace and guard stay in to
+  check it: expect slot 0's script starts above 16 MB, no "dropped animation ID", Ryu's select
+  close-up intact and his AI fighting back.
+
+### Run 7 (2026-10-29, animation-ID guard built; `port/logs/smoke-20261029-091851.log`)
+**No crash with Ryu Hayabusa.** The guard dropped -256 four times (its log cap) and two Watch-mode
+fights with Ryu played to the end, Hayate on the ring stage and on the helipad, at 60 fps, then
+back to the title screen (the game was closed there, `TerminateTitle`, no crash report).
+- **Open: the user reports Ryu's animations look wrong** ("the animation timing thing"), on the
+  select screen and in the fight. The user's desktop recording of the second fight (NVIDIA
+  capture, 83 s, 60 fps) shows smooth pacing: a new game frame in every captured frame, one hitch.
+  In stills the fight looks plausible (throws, knockdowns, effects). The one clear oddity: on the
+  select screen Ryu's model drifts up out of his panel after the face close-up (panel empty for
+  about 1.5 s), then comes back cut off at the shoulders and slides down.
+- **The guard is probably not the cause:** the table it guards looks like facial expressions
+  (the same function picks a random entry about every 60 frames, like idle blinking). Not proven.
+- **The user picked the select screen as the clearest case.** Compared with the real game (a
+  Series X backwards-compatibility video and a story-mode walkthrough on YouTube): there,
+  hovering Ryu shows the face close-up for about 0.8 s, then cuts to a full-body shot, a pose with
+  a vanish, then the upper body with the sword, all in frame. In the port the face close-up holds
+  about 3 s and the camera never cuts: the model keeps animating inside the close-up framing, so
+  the head turns and rises out of the panel, the panel is empty about 1.5 s, and the body comes
+  back cut off at the shoulders. **Hayate's sequence in the port is right** (face, full body,
+  jump, pose, upper body), so the fault follows Ryu's data.
+- **Not the guard:** it logs its first 4 drops, at 09:19:36, 09:19:49, 09:21:02 and 09:21:13, all
+  in fights; the select-screen hover was at about 09:20:23.
+- **Trace (not built):** `src/anim_trace.cpp` logs, per game frame, each player's motion-script
+  starts (with their first bytes), every animation-ID request (`sub_82373680`, `sub_82372D78`),
+  the consumer's gate bytes, and every request applied or dropped as stale. Run: hover Ryu on the
+  left panel about 8 s without pressing A, then Hayate about 8 s, then Kasumi, then pick Ryu.
+
+### Run 6 (2026-10-29, script-dispatch probe, Ryu as player 1; `port/logs/smoke-20261029-085747.log`)
+> **Superseded by runs 8 and 9:** the reading below, "a bug in the original game", was wrong. The
+> bytes were section 8's records run as a script, because Ryu's script table was never
+> relocated. FINDINGS.md, "Ryu Hayabusa's unrelocated scripts", has the evidence; the guard
+> described here was removed.
+
+Same crash. **The dump settled it:** the stream the interpreter ran is Ryu's `ryu.bin` from
+`anm.afs` (not `mot.afs`), loaded at guest 0x10000, byte for byte, and the walk is in step with
+the format (tagged records the interpreter skips 2 bytes at a time by design, via an opcode-length
+table). Opcode 20 really carries 0xFF00 in Ryu's data: **a bug in the original game**, an
+out-of-bounds read the console survives. Full write-up in FINDINGS.md, "The negative animation
+ID in Ryu Hayabusa's script".
+- **The fix (not built):** the three probes are gone; `src/anim_id_guard.cpp` hooks 0x823729B0,
+  just after the signed bound check, and jumps to 0x82372B14 for a negative index, the original's
+  own path for an out-of-range ID or a null entry. It logs the first 4 drops ("DOA4: dropped
+  animation ID ...").
+- **Not confirmed:** why the console survives (likely: the page is committed in the game's 64K-page
+  heap and the read returns heap data) and whether these streams are Ryu's face (masked).
+
+### Run 5 (2026-10-29, Ryu as player 1, 180 s; `port/logs/smoke-20261029-082927.log`)
+Same crash (`crash-20261029-083044.txt`). **The call-site probe named the source:** lr
+0x8240DB64, opcode 20 of the motion-script interpreter in `sub_8240CE58` (dispatch at
+0x8240D390, a 160-entry jump table at 0x8240D3BC that the generated switch matches entry for
+entry). Opcode 20 reads the halfword after it from the player's script stream and passes it,
+sign-extended, as the ID: 0xFF00, so -256.
+- **The original does the same lookup** (signed bound check, then `lwz` through the entry), so on
+  the console this would read 0x42C80000 too. That address is in the 64K-page heap, which only
+  `X_MEM_LARGE_PAGES` allocations fill; nothing in our logs lives there.
+- **The byte pattern `00 14 FF 00` is common:** 362 hits in `mot.afs`, in every character's
+  motion files, Kasumi's included (run 4 played fine). So a raw search can't tell real data from
+  an interpreter that fell out of step with the stream.
+- **Third probe (not built):** `Doa4ProbeScriptOp` at the dispatch keeps each player's last 32
+  (pointer, opcode) pairs; `Doa4ProbeIdSource` dumps them and 96 bytes of the stream when a
+  negative ID appears. Then find those bytes in `ryu.mot` (entry 13) or `m_ryu.mot` (14) and
+  check whether the opcode boundaries line up.
+
+### Run 4 (2026-10-29, call-site probe built; `port/logs/smoke-20261029-082038.log`)
+**A full fight plays.** The user chose Watch mode with Kasumi and a random stage: the cherry
+blossom bridge and the river stage, both fighters, health bars and hits, all drawn correctly at
+60 fps, then back to character select. No probe line, no crash. The user then picked Ryu
+Hayabusa; the 120 s limit closed the game while that fight loaded (no crash report).
+- **Ryu Hayabusa is the common factor:** player 0 was Ryu in run 2 (vs Christie) and run 3 (vs
+  Hitomi, Las Vegas stage, crash as the fight opened). So the 0xFF00 halfword is most likely in
+  Ryu's own data (a motion or sound event table), read through one of the 7 call sites.
+- **Next run:** pick Ryu as player 1, smoke `-Seconds 180` so the load finishes.
+
+### Run 3 (2026-10-29, ID-table probe built; `port/logs/smoke-20261029-080319.log`)
+The user drove the pad into Sparring again. 60 fps throughout, then the same crash at +68 s on
+Now Loading. **The probe answered:** the ID in player 0's field 4 is **0xFFFFFF00 (-256)**, index
+-256 into the 8-entry table at 0x82CE86D8. The table is intact; the index is out of range.
+- **Where the ID comes from:** `sub_82373680` is the setter (`stw r4,4(r11)`). Of its 3 callers,
+  only `sub_82372CB0` passes a caller's ID; the other two pass 0. `sub_82372CB0` has 7 call sites
+  (`sub_8241FFE0`, `sub_823802A0`, `sub_8240CE58` x3, `sub_823F9418`, `sub_823F9E48`), and every one
+  sign-extends a halfword (`extsh`), as the original code does. So the value is the halfword 0xFF00
+  from game data, or data we loaded or swapped wrong. Not yet known which.
+- **Second probe (not built):** `Doa4ProbeIdSource` at `sub_82372CB0`'s entry logs every negative
+  ID with the return address (which call site) and the caller's 196(r1), the halfword array of
+  `sub_8240CE58`'s two `lhzx` sites. `lr` comes from the thread's guest context, since midasm
+  hooks only take registers.
+
+### Run 2 (2026-10-29, FPSCR hooks built; `port/logs/smoke-20261029-063849.log`)
+Captures in `private/captures/doa4-20261029-063849/`, contact sheet `private/captures/run2-sheet.png`.
+- **The FP crash is fixed:** no C000008F; the audio worker runs.
+- **On screen, all drawn correctly:** the storm-sea intro (+10 s), clouds (+15 s), the sunrise
+  over the peaks (+20 s), the **Mode Select** menu over the shrine stage with the mode icons
+  and help text (+30-35 s), **Sparring character select** with the roster, Hayabusa and
+  Christie in 3D (+40-50 s), then **Now Loading** (+55 s). No autopilot ran: the menu choices
+  came from the connected Xbox Series X pad.
+- **The game's own frame rate** (`Doa4FrameMark`): 60.0-60.3 fps, median 16.6-16.7 ms in every
+  10 s window; three single long frames (1.2 s, 1.2 s, 0.54 s) at loads.
+- **Crash at +58 s** on the main thread, on Now Loading: access violation reading guest
+  0x42C80000 in `sub_82372840` (`crash-20261029-063947.txt`; stack: `sub_82371DC0`,
+  `sub_8234F030`, `sub_82354DB0`, `sub_824F4878`, `sub_824F41E0`, `xstart`). 0x42C80000 is
+  100.0f used as a pointer. The function takes a per-player object (580 bytes each at
+  0x8302BC98), reads an ID from its field 4 and looks it up in `{count, array}` tables at
+  0x82CE86F8 (IDs below 0x2000 and from 0x3000) or 0x82CE88F0 (0x2000-0x2FFF, index ID-0x2000),
+  then loads two pointers from the entry. In the image both tables are 8 and 10 valid pointers,
+  with no 100.0 just before either array; 100.0 words sit about 120 slots before, in
+  neighbouring tables. The bound check is a signed compare, so a negative or wrong ID would read
+  there; the other reading is that something overwrote the table at run time. Unproven.
+- **Probe (built in run 3):** `src/id_table_probe.cpp`, a midasm hook just after the entry load
+  (0x823729BC), logs every non-pointer entry with the ID, index, count, array and player slot.
+
+### Run 1 (2026-10-29, the user's OK; `port/logs/smoke-20261029-063237.log`)
+Captures in `private/captures/doa4-20261029-063237/`.
+- **Vulkan works:** RTX 4090, the Xenos plugin's Vulkan backend, presents from +0.15 s at
+  1280x720; `readback_resolve` 'none'. The Xbox Series X pad connects as player 1.
+- **The fiber hooks work:** ConvertThreadToFiber on the main thread, then CreateFiber (start
+  0x824F3310, 32 KB stack). No "unregistered function".
+- **On screen:** the game's copyright / FEDERAL WARNING text, crisp and correct (+10 s).
+- **Crash at +12.2 s:** C000008F (inexact) on the audio worker in `sub_8297D748`, under the
+  worker's callback `sub_82968368`, MXCSR 0x8060: every FP exception unmasked
+  (`crash-20261029-063249.txt`). The same as Quake 4's and GRAW's first boots: the runtime never
+  seeds the audio worker's context.
+- **Fix (manifest, not yet built):** `Doa4GuardFpscr` hooked at the callback's entry and before
+  each of the image's six `mtfsf` (`src/fpscr_guard.cpp`, as Quake 4).
+- Noise, none fatal: `D:\DOA4\` opens fail (devkit path); **`cache:\chrone.afs` probes** (52
+  `cache:` lines): the game looks for a cached copy of its character archive on the cache
+  partition (StfsCreateDevice is a stub, so there is none) and should fall back to the disc;
+  watch for load-time cost later. `IoDismountVolumeByFileHandle` stub, devkit-memory warning.
+
+### M0 (2026-10-29): `doa4.exe` builds clean
+
+`port/out/build/win-amd64-relwithdebinfo/doa4.exe` (52 MB) with `rexgpu-xenosrd.dll` and
+`rexruntimerd.dll` beside it, byte-identical to the Vulkan-only install's (SHA-256 checked). The
+renderer DLL imports no Direct3D 12 (its import table is the C runtime, Tracy and the runtime
+DLL; Vulkan is loaded at run time).
+
+Verified on the translation (final codegen, build 5):
+- codegen: no errors or warnings;
+- `check_switch_tables.py`: 826 switches, 5 flagged, all benign (FINDINGS.md "Switches"); 2
+  more were a code generator bug, fixed by overrides;
+- `check_vector_aliasing.py`: no vpkd3d128 hazards in 240,454 vector instructions;
+- `find_missed_functions.py`: at a fixed point (only the four dropped candidates remain);
+- `find_vcall_thunks.py`: 2 matches, both false positives (FINDINGS.md).
+
+Manifest rounds (`port/doa4_manifest.toml`; builds in `private/build-1..5.log`):
+1. three `b` targets "not in any function", each a function start right after the previous
+   function's last branch (0x8296EAC8, 0x82450CB0, 0x829CCF50);
+2. `doa4.exe` linked; one warning, "Unresolved b target 0x82793F80 from 0x827925E8": the fiber
+   context save/load routine behind SwitchToFiber's thunk, as in DOAX2's round 2 (its
+   0x82785670). Added with it, before any run: `setjmp_address`/`longjmp_address` (0x82A04560 /
+   0x82A04220, matched against DOAX2's pair over 24 instructions with immediates masked), the
+   five XAPI fiber routines in `[entrypoint.rexcrt]` (FINDINGS.md), and the `Doa4FrameMark`
+   midasm hook on the one VdSwap call (0x8275B0BC);
+3. clean; then the finder's 96 candidates wholesale and two switch overrides. Four candidates
+   split functions ("Unresolved" warnings) and were dropped (0x82330258, 0x827D5708, 0x829400E8,
+   0x82A0FC34); build 5 clean.
+
+**A code generator bug, new in this family** (FINDINGS.md "Switches"): where the index is a
+sign-extended halfword loaded from a table into r11, the generated switch reads r3, the value the
+table offset was built from. Two switches (sub_8251D328, sub_8251DA10), both overridden. Worth an
+upstream issue to ReXGlue with the two sites as examples.
+
+`find_vcall_thunks.py` had Quake 4's `.text` range hard-coded (0x82150000, 0x813604), unchanged
+through lotr-conquest-360-recomp; it now carries DOA4's (0x822F0000, 0x86EDFC). **LOTR's "0
+forwarders" ran on the wrong range** (it skipped the first 640 KB of LOTR's code and read past
+its end). Rerun on LOTR's own range (lotr-conquest-360-recomp PR #2, 2026-10-29): still 0.
+
+Repository: https://github.com/Juansolo457/doa4-360-recomp, **public**, created 2026-10-29 with
+the bootstrap commit on `master`. Branch protection read back from the GitHub API
+(`repos/Juansolo457/doa4-360-recomp/branches/master/protection`, 2026-10-29): `audit` required
+and strict, conversation resolution on, admins included, force pushes and deletion off. Merge
+commits kept, branches deleted on merge. The first `audit` run on `master` passed. CodeRabbit
+lists the repository in its dashboard (Repositories: doa4-360-recomp, Public) and reviewed PR #1.
+
+Bootstrap notes: the repo is `../lotr-conquest-360-recomp`'s shape renamed (`lotrc` -> `doa4`,
+`LotrConquestApp` -> `Doa4App`, `LOTRC_` cvars -> `DOA4_`, the XEX hash and title); LOTR's forced
+`readback_resolve=fast` was taken out (DOA4 starts on the SDK default and logs it). The audit and
+`.gitignore` know DOA4's formats (`.afs`, `.sfd`, `.xgs`, `.dic`, `.tpr`, `.mot`, `.ptc`, the MPEG
+program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 files); the
+decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Codegen round 1** (`tools/build.ps1`, with the user's OK): expect `b` targets "not in any
-   function" (leaf thunks) and possibly byte-indexed jump tables. After it:
-   `check_switch_tables.py` (the shader compiler is in this image), `find_missed_functions.py`
-   wholesale, `find_vcall_thunks.py`; drop any candidate that yields an "Unresolved" warning.
-2. **Before the first run:** find the MS CRT `setjmp`/`longjmp` (the layout is in the manifest
-   comment) and the five XAPI fiber routines (DOAX2 identified them by their error codes 1280 and
-   1281 and the 0xA50 context at KTHREAD+0x164); bind both in the manifest. Find the game's
-   `VdSwap` call site for `Doa4FrameMark`.
-3. **First smoke run** (`tools/smoke.ps1 -Seconds 60 -CaptureEvery 5`, headless, the user's OK):
-   expect the warning screen, the Sofdec intro, the title. Then `tools/autopilot/boot.txt` with
-   the real timings filled in.
-4. Commit M0 on a branch, open the PR, let CodeRabbit review, merge.
+1. **Windows stream:** PR #1 (all of M0-M1, Ryu's fix, 1440p default) through CodeRabbit's
+   review, every thread resolved, then merged. 1440p is the launcher default (the user,
+   2026-10-29); M2 checks (more characters, Story, Survival, the critical-hit flash at scale 1).
+2. **Then the Linux stream:** the native Linux build for the Steam Deck (PLAN.md M5), 720p by
+   default, no Proton package first.
+3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
+4. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
+   captures, so a fight can be reached without a person at the pad.
+5. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
+6. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
 
 ## How it is built and run
 ```

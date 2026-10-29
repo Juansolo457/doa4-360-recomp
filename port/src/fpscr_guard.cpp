@@ -8,11 +8,11 @@
 // runs the game's mixer callback, is not seeded, so its cached value is 0 and the mixer's first
 // vector op writes MXCSR with every FP exception unmasked.
 //
-// Quake 4's and GRAW's first boots died that way (C000008F on the audio worker). Kept here
-// ready: if a boot dies with an FP exception on the audio thread, hook Doa4GuardFpscr at the
-// callback's entry and before each mtfsf ([[entrypoint.midasm_hook]] in doa4_manifest.toml,
-// as in ../quake4-360-recomp). It seeds the context the way InitHost does: the current MXCSR
-// with every exception masked.
+// Quake 4's and GRAW's first boots died that way (C000008F on the audio worker), and so did
+// DOA4's (2026-10-29, MXCSR 0x8060 under the audio callback sub_82968368). Doa4GuardFpscr is
+// hooked at the callback's entry and before each mtfsf ([[entrypoint.midasm_hook]] in
+// doa4_manifest.toml). It seeds the context the way InitHost does: the current MXCSR with every
+// exception masked.
 
 #include <rex/ppc/context.h>
 #include <rex/system/thread_state.h>
