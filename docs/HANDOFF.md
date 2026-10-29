@@ -7,9 +7,19 @@ next model starts here, not from chat history.
 
 ## Where it stands
 **M1 nearly there (2026-10-29): runs 2 and 3 reach the main menus, Sparring and character select at
-the game's 60 fps, then crash on the Now Loading screen into the first fight.** Run 3's probe showed
+the game's 60 fps, then crash loading a fight with Ryu Hayabusa; run 4 played a full fight with Kasumi.** Run 3's probe showed
 the cause is an out-of-range ID (-256); a second probe for where it comes from is in the
 manifest, not yet built. M0 is done (below).
+
+### Run 4 (2026-10-29, call-site probe built; `port/logs/smoke-20261029-082038.log`)
+**A full fight plays.** The user chose Watch mode with Kasumi and a random stage: the cherry
+blossom bridge and the river stage, both fighters, health bars and hits, all drawn correctly at
+60 fps, then back to character select. No probe line, no crash. The user then picked Ryu
+Hayabusa; the 120 s limit closed the game while that fight loaded (no crash report).
+- **Ryu Hayabusa is the common factor:** player 0 was Ryu in run 2 (vs Christie) and run 3 (vs
+  Hitomi, Las Vegas stage, crash as the fight opened). So the 0xFF00 halfword is most likely in
+  Ryu's own data (a motion or sound event table), read through one of the 7 call sites.
+- **Next run:** pick Ryu as player 1, smoke `-Seconds 180` so the load finishes.
 
 ### Run 3 (2026-10-29, ID-table probe built; `port/logs/smoke-20261029-080319.log`)
 The user drove the pad into Sparring again. 60 fps throughout, then the same crash at +68 s on
@@ -119,8 +129,8 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Rebuild with the call-site probe and rerun into a fight** (both need the user's OK): its log
-   line names the call site that passes -256 and, for `sub_8240CE58`, the halfword array. Then
+1. **Rerun with Ryu Hayabusa as player 1, 180 s** (needs the user's OK; the call-site probe is
+   built): its log line names the call site that passes -256 and, for `sub_8240CE58`, the halfword array. Then
    trace that halfword to its file or writer, fix the cause, and take both probes out.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.

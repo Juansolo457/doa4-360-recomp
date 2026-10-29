@@ -23,7 +23,7 @@ Steam Deck, both on Vulkan.
 ## Status
 
 Boots on Windows (2026-10-29): intro, Mode Select and character select draw correctly at the
-game's 60 fps. Loading into a fight still crashes. See [docs/HANDOFF.md](docs/HANDOFF.md).
+game's 60 fps. A fight plays; fights with Ryu Hayabusa still crash. See [docs/HANDOFF.md](docs/HANDOFF.md).
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones, lessons from the sister projects
 - [docs/HANDOFF.md](docs/HANDOFF.md): current state, how things work, where things live
