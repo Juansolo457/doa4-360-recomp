@@ -9,7 +9,18 @@ next model starts here, not from chat history.
 **M1 reached, M2 close (2026-10-29): menus, character select and full fights play at 60 fps,
 every character tried so far, Ryu Hayabusa included since run 9** (his scripts were left
 unrelocated because his file loaded at guest 0x10000; `src/low_memory.cpp` keeps that range
-free). The trace and the old guard are removed but that build is not yet run. M0 is done (below).
+free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below).
+
+### Run 10 (2026-10-29, 4K internal: `--resolution_scale=3 --anisotropic_override=5`; `port/logs/smoke-20261029-104915.log`)
+First run of the build without the trace and guard, and the first at 4K: the renderer reports
+"draw-scale swap sizing: packet=1280x720, src_scaled=3840x2160" (and its standard "Vulkan draw
+resolution scaling is experimental" warning). The user played Sparring, Ryu against Leifang on
+the helipad. **60.0 fps in every 10 s window**, no crash, no new errors (only the known `cache:`
+and `StfsControlDevice` stubs). The captures (the 2560x1440 window, so 4K downsampled) are clean:
+sharp HUD text and move list, no seams or half-pixel lines on models or stage, menus and select
+screen correct. Two near-white frames fall on critical hits, most likely the game's hit flash;
+not compared against scale 1. Real 4K output needs fullscreen on a 4K display
+(`tools/launch.ps1 -Scale 3` without `-Windowed`).
 
 ### Run 9 (2026-10-29, low-memory reservation; `port/logs/smoke-20261029-104238.log`)
 **Ryu Hayabusa is fixed.** "DOA4: reserved guest 0x00010000-0x01000000" at start; his scripts
@@ -210,9 +221,8 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Build without the trace and guard, and try 4K** (needs the user's OK):
-   `tools/launch.ps1 -Windowed -Scale 3` renders at 3840x2160 (`--resolution_scale=3`); check
-   bloom, depth of field and the menus for scaling artefacts, and the frame rate.
+1. **M2 checks at 4K:** more characters and stages, Story and Survival, and the critical-hit
+   flash against scale 1; then the Proton Deck package (PLAN.md, after M2).
 2. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
 3. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
