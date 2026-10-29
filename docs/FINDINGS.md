@@ -137,6 +137,24 @@ A bug in the original game that the console hides. Guarded by `src/anim_id_guard
   0x40000000, so 0x42C80000 is likely committed there and the read returns heap data. The streams
   may be facial animation hidden by Ryu's mask.
 
+### Ryu Hayabusa's unrelocated scripts (run 8, 2026-10-29)
+The likely root of every Ryu fault (the -256 ID, the select-screen warp, an AI that never attacks).
+- **How a motion's events are found:** `sub_8240AFB8` (motion start) takes the player's motion
+  (`lhz 48`), keeps the low 10 bits, and loads the script pointer from a 1024-entry table: for
+  motions below 0x2000 the character's own, `*(0x830AD870 + 132*char + 84)`, that is anm header
+  section 21; the stream pointers live at 0x830BB60C + 4*slot. `sub_8240CCE8` runs them each
+  frame (opcode 1 = wait for motion frame N), calling the interpreter `sub_8240CE58`.
+- **Section 21** of each `<character>.bin` starts with that table of 1024 file offsets (Ryu's:
+  0x10598, 0x105D8, ...; Kasumi's 0xE6A8, ...), followed by the scripts.
+- **In the port Ryu's table stays raw:** his `ryu.bin` is loaded at guest 0x10000 (the 4K heap's
+  first page), and run 8's trace shows slot 0 starting scripts at 0x105D8, 0x1090C, 0x10968 and
+  eight more raw table entries (11 of 31 starts match with base 0), so the interpreter runs file
+  offsets 0x5D8 onwards: header and record data. Run 6's stream (0x160B0, file offset 0x60B0) is
+  inside section 8's 16-byte records.
+- **Why only Ryu, likely:** a relocation that skips values that already look like pointers (at
+  or above the base). With the base at 0x10000 Ryu's offsets 0x10598-0x21348 do; other files
+  load higher. Not yet confirmed in the code; the experiment is `src/low_memory.cpp`.
+
 ### Emulator state
 Xenia Canary [game-compatibility #207](https://github.com/xenia-canary/game-compatibility/issues/207):
 `state-playable`. No published static recompilation of this title was found (2026-10-29).

@@ -10,6 +10,20 @@ next model starts here, not from chat history.
 included since run 7** (his crash was an out-of-bounds read in the original game, now guarded).
 Open: Ryu's animations look wrong to the user. M0 is done (below).
 
+### Run 8 (2026-10-29, animation trace; `port/logs/smoke-20261029-095748.log`)
+The user hovered Ryu, Kasumi, Hayate and others, then played Watch with Ryu against Kasumi, and
+recorded it (NVIDIA capture `Desktop 2026.10.29 - 09.58.46.07.mp4`, not in the repo).
+- **Ryu's select model warps:** it flattens to a vertical sliver and vanishes (recording 5.5-6 s
+  and 26 s); every other character holds a normal close-up. **In the fight Ryu never lands a hit**
+  (his score stays 0, Kasumi's reaches 180), as in run 7. The guard dropped -256 once.
+- **The trace found the cause (FINDINGS.md, "Ryu Hayabusa's unrelocated scripts"):** Ryu's motion
+  scripts are looked up in a table that was never relocated, so they run his file's header and
+  record data. His file sits at guest 0x10000.
+- **Experiment (not built):** `src/low_memory.cpp` reserves guest 0x10000-0x1000000 before the
+  game starts, so nothing loads that low (as on the console). The trace and guard stay in to
+  check it: expect slot 0's script starts above 16 MB, no "dropped animation ID", Ryu's select
+  close-up intact and his AI fighting back.
+
 ### Run 7 (2026-10-29, animation-ID guard built; `port/logs/smoke-20261029-091851.log`)
 **No crash with Ryu Hayabusa.** The guard dropped -256 four times (its log cap) and two Watch-mode
 fights with Ryu played to the end, Hayate on the ring stage and on the helipad, at 60 fps, then
@@ -186,9 +200,9 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Ryu's select-screen fault** (run 7): build the trace and run the hover sequence above (needs
-   the user's OK), compare Ryu's requests and script starts with Hayate's, then fix and remove
-   the trace.
+1. **Build the low-memory experiment and rerun with Ryu** (needs the user's OK): hover Ryu,
+   then Watch Ryu against anyone. If it fixes him, find the relocation check in the code to
+   confirm the reason, then remove the trace and, if it never fires, the guard.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
 3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
