@@ -1,15 +1,16 @@
 # Launch the DOA4 recomp for playing (Vulkan). The guest is told it is on a 1280x720 display (as
 # a 360 on an HD TV; this also avoids ReXGlue's 4:3 squeeze at 200% Windows scaling) and renders
 # at a multiple of that. This opens a window on the user's screen. Never kill a running doa4.exe.
-#   pwsh -NoProfile -File tools/launch.ps1 -Windowed            # 720p internal (the 360's), windowed
+#   pwsh -NoProfile -File tools/launch.ps1 -Windowed            # 1440p internal (the default), windowed
 #   pwsh -NoProfile -File tools/launch.ps1                      # fullscreen
+#   pwsh -NoProfile -File tools/launch.ps1 -Windowed -Scale 1   # 720p internal (the 360's)
 #   pwsh -NoProfile -File tools/launch.ps1 -Windowed -Scale 3   # 4K internal
 #   pwsh -NoProfile -File tools/launch.ps1 -Windowed -Trace     # every kernel call in the log
 [CmdletBinding()]
 param(
-    # Internal resolution: 1 = 720p (the default until the optimisation pass, the user's call
-    # 2026-10-27), 2 = 1440p, 3 = 4K.
-    [ValidateRange(1,3)][int]$Scale = 1,
+    # Internal resolution: 1 = 720p (the 360's; the Steam Deck's default), 2 = 1440p (the Windows
+    # default, the user's call 2026-10-29), 3 = 4K (60 fps in run 10).
+    [ValidateRange(1,3)][int]$Scale = 2,
     [ValidateSet(-1,0,1,2,3,4,5)][int]$Anisotropic = 5,  # SDK enum: 5 = 16x, -1 = the game's own
     [switch]$Windowed,
     [switch]$Trace,

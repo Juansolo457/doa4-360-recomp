@@ -72,7 +72,7 @@ pwsh -NoProfile -File tools/launch.ps1 -Windowed
 
 | Option | Effect |
 |---|---|
-| `-Scale 1..3` | internal resolution: 1 = 1280×720 (the console's, default), 2 = 2560×1440, 3 = 3840×2160 |
+| `-Scale 1..3` | internal resolution: 1 = 1280×720 (the console's), 2 = 2560×1440 (default), 3 = 3840×2160 |
 | `-Windowed` | a window instead of full screen |
 | `-Trace` | every kernel call in the log |
 
@@ -80,4 +80,5 @@ Saves stay in `port/user`, logs in `port/logs`. A crash writes `crash-<time>.txt
 
 ## Linux and the Steam Deck
 
-Not yet: the native Linux build comes after Windows ([PLAN.md](PLAN.md), M5).
+Not yet: the native Linux build comes after the Windows work is reviewed and merged
+([PLAN.md](PLAN.md), M5). On the Deck it will default to 720p.

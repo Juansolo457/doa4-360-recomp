@@ -23,8 +23,7 @@ Order of work: **the PC (Windows) build first, native Linux after, both Vulkan o
   change through a PR, the `audit` check, an up-to-date branch, every review thread resolved,
   admins included. CodeRabbit gets a `.coderabbit.yaml` from day one (section "Review").
 - **PC first, Linux later.** The native Linux/Deck build is a milestone of its own (M5), after
-  the Windows build plays well. A Proton test package on the Deck may come earlier as a
-  cheap preview, as LOTR and DOAX2 did; it is not the Linux deliverable.
+  the Windows work is reviewed and merged (the user, 2026-10-29: no Proton package first).
 - **Source only.** No release ever carries translated game code, game files or keys. Players
   build from their own disc (SETUP.md). The repository is **public** from day one.
 - **No builds, codegen or game windows without the user's OK.** They test other games on this
@@ -192,6 +191,10 @@ Each milestone is at least one pull request. M0 and M1 may share one, as LOTR's 
 ## Settled in review (the user, 2026-10-29, Plannotator)
 - **Public repository** from day one: `Juansolo457/doa4-360-recomp`, locked master, source only.
 - **Ask before every build and run** (the default rule stands; no standing OK for this repo).
-- **A Proton test package on the Deck after M2** (a fight plays), before the native Linux build.
+- ~~A Proton test package on the Deck after M2~~ (superseded 2026-10-29, below).
+- **Two streams (the user, 2026-10-29):** Windows first, at **1440p internal by default**
+  (`tools/launch.ps1 -Scale 2`; 720p and 4K stay options). Once CodeRabbit has reviewed it and
+  the PR is merged, the **native Linux build for the Steam Deck** (M5, no Proton package
+  first), **720p by default** there.
 - Scope stays the offline game on this disc. Title updates, DLC costumes and Xbox Live play are
   not planned; revisit only if the user asks.

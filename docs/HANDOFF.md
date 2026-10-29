@@ -221,13 +221,16 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **M2 checks at 4K:** more characters and stages, Story and Survival, and the critical-hit
-   flash against scale 1; then the Proton Deck package (PLAN.md, after M2).
-2. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
-3. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
+1. **Windows stream:** PR #1 (all of M0-M1, Ryu's fix, 1440p default) through CodeRabbit's
+   review, every thread resolved, then merged. 1440p is the launcher default (the user,
+   2026-10-29); M2 checks (more characters, Story, Survival, the critical-hit flash at scale 1).
+2. **Then the Linux stream:** the native Linux build for the Steam Deck (PLAN.md M5), 720p by
+   default, no Proton package first.
+3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
+4. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
-4. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
-5. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
+5. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
+6. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
 
 ## How it is built and run
 ```
