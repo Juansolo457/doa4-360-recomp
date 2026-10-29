@@ -87,7 +87,7 @@ upstream issue to ReXGlue with the two sites as examples.
 `find_vcall_thunks.py` had Quake 4's `.text` range hard-coded (0x82150000, 0x813604), unchanged
 through lotr-conquest-360-recomp; it now carries DOA4's (0x822F0000, 0x86EDFC). **LOTR's "0
 forwarders" ran on the wrong range** (it skipped the first 640 KB of LOTR's code and read past
-its end): rerun there with LOTR's own range.
+its end). Rerun on LOTR's own range (lotr-conquest-360-recomp PR #2, 2026-10-29): still 0.
 
 Repository: https://github.com/Juansolo457/doa4-360-recomp, **public**, created 2026-10-29 with
 the bootstrap commit on `master`. Branch protection read back from the GitHub API
@@ -109,7 +109,7 @@ decrypted image, import names and `.pdata` list are in `private/xex/`.
    fix (an ID source bug, or a write that hits the table), and the probe comes out.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
-3. An upstream issue for the halfword-index switch bug; LOTR's `find_vcall_thunks.py` rerun.
+3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
 4. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
 
 ## How it is built and run
