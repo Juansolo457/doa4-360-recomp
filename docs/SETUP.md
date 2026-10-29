@@ -5,8 +5,8 @@ translated from your copy of the Xbox 360 disc on your own PC, and the game data
 same disc. You need your own disc of **Dead or Alive 4** for the Xbox 360, the USA/Europe
 Rev 1 release (see step 3).
 
-> Early days: the first translation and build are next. See [HANDOFF.md](HANDOFF.md) for
-> where it stands.
+> Work in progress: the game builds and plays on Windows (menus and full fights). Other modes
+> are still being checked. See [HANDOFF.md](HANDOFF.md) for where it stands.
 
 The first setup takes about an hour, most of it compiling the ReXGlue SDK. After that, rebuilds
 take a few minutes.

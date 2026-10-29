@@ -22,8 +22,10 @@
 #include <rex/system/kernel_state.h>
 #include <rex/system/xmemory.h>
 
+// Read once, before the game's first instruction: a change takes effect at the next start.
 REXCVAR_DEFINE_BOOL(doa4_reserve_low_memory, true, "DOA4",
-                    "Reserve guest 0x10000-0x1000000 so game allocations start at 16 MB");
+                    "Reserve guest 0x10000-0x1000000 so game allocations start at 16 MB")
+    .lifecycle(rex::cvar::Lifecycle::kRequiresRestart);
 
 void Doa4ReserveLowMemory() {
   if (!REXCVAR_GET(doa4_reserve_low_memory)) {

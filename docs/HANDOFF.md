@@ -73,6 +73,11 @@ back to the title screen (the game was closed there, `TerminateTitle`, no crash 
   left panel about 8 s without pressing A, then Hayate about 8 s, then Kasumi, then pick Ryu.
 
 ### Run 6 (2026-10-29, script-dispatch probe, Ryu as player 1; `port/logs/smoke-20261029-085747.log`)
+> **Superseded by runs 8 and 9:** the reading below, "a bug in the original game", was wrong. The
+> bytes were section 8's records run as a script, because Ryu's script table was never
+> relocated. FINDINGS.md, "Ryu Hayabusa's unrelocated scripts", has the evidence; the guard
+> described here was removed.
+
 Same crash. **The dump settled it:** the stream the interpreter ran is Ryu's `ryu.bin` from
 `anm.afs` (not `mot.afs`), loaded at guest 0x10000, byte for byte, and the walk is in step with
 the format (tagged records the interpreter skips 2 bytes at a time by design, via an opcode-length

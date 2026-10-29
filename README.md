@@ -22,8 +22,10 @@ Steam Deck, both on Vulkan.
 
 ## Status
 
-Boots on Windows (2026-10-29): intro, Mode Select and character select draw correctly at the
-game's 60 fps. Full fights play at 60 fps, Ryu Hayabusa included, at 1440p internal by default (4K with `-Scale 3`). See [docs/HANDOFF.md](docs/HANDOFF.md).
+Plays on Windows (2026-10-29): intro, menus, character select and full fights, Ryu Hayabusa
+included. The game held its 60 fps in the runs tested so far, at 720p internal and in one
+Sparring match at 4K (`-Scale 3`). The launcher's default is 1440p (`-Scale 2`), not yet
+measured. See [docs/HANDOFF.md](docs/HANDOFF.md).
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones, lessons from the sister projects
 - [docs/HANDOFF.md](docs/HANDOFF.md): current state, how things work, where things live
