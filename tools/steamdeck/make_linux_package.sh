@@ -8,8 +8,9 @@
 #   tools/steamdeck/make_linux_package.sh --deck deck@steamdeck --with-game
 # --deck copies the folder to ~/recomps/DOA4-360-SteamDeck on that host over SSH; logs/, game/ and
 # user/ there are left alone. --with-game also copies port/assets (your disc's files, about
-# 6.8 GB) to its game/ when the Deck has no game/default.xex yet. The folder holds programs made
-# from your disc and, on the Deck, its data: it never goes to GitHub or anywhere else.
+# 6.8 GB) to its game/ unless an earlier copy there finished (it leaves .game-complete beside
+# game/). The folder holds programs made from your disc and, on the Deck, its data: it never goes
+# to GitHub or anywhere else.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -63,7 +64,8 @@ if [[ -n "$deck" ]]; then
   # The programs and libraries; logs/, game/ and user/ on the Deck are left alone.
   tar -C "$out" -cf - . | ssh "${ssh_opts[@]}" "$deck" "tar -C ~/$dest -xf -"
   if [[ $with_game -eq 1 ]]; then
-    if ssh "${ssh_opts[@]}" "$deck" "test -f ~/$dest/game/default.xex"; then
+    # Not game/default.xex: a copy that stopped partway has that, and the rest would never come.
+    if ssh "${ssh_opts[@]}" "$deck" "test -f ~/$dest/.game-complete"; then
       echo "The Deck has game/ already: not copied"
     else
       assets="$(readlink -f "$root/port/assets")"
@@ -71,6 +73,8 @@ if [[ -n "$deck" ]]; then
       echo "Copying the disc's files to the Deck's game/ (about 6.8 GB)"
       ssh "${ssh_opts[@]}" "$deck" "mkdir -p ~/$dest/game"
       tar -C "$assets" -cf - . | ssh "${ssh_opts[@]}" "$deck" "tar -C ~/$dest/game -xf -"
+      # Only now: a failed copy ended the script above (pipefail), unmarked.
+      ssh "${ssh_opts[@]}" "$deck" "date > ~/$dest/.game-complete"
     fi
   fi
   ssh "${ssh_opts[@]}" "$deck" "cd ~/$dest && ls -la"

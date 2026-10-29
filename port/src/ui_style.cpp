@@ -40,8 +40,10 @@ void AddFonts(ImFontAtlas* atlas) {
                                        "C:\\Windows\\Fonts\\bahnschrift.ttf",
                                        "C:\\Windows\\Fonts\\arial.ttf"};
 #else
-  // Noto Sans is SteamOS's default sans (Arch's paths); DejaVu Sans as on Arch, then Debian's.
+  // Noto Sans (SteamOS's default sans), then DejaVu Sans: each at Arch's (SteamOS's) path, then
+  // Debian's and Ubuntu's.
   static const char* const kFonts[] = {"/usr/share/fonts/noto/NotoSans-Regular.ttf",
+                                       "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
                                        "/usr/share/fonts/TTF/DejaVuSans.ttf",
                                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"};
 #endif

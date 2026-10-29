@@ -8,8 +8,12 @@
 here="$(cd "$(dirname "$0")" && pwd)"
 cd "$here" || exit 1
 # user/ first: the program puts the profile, saves and shader cache there only if it exists
-# (Doa4App::OnConfigurePaths), and the package doesn't carry it.
-mkdir -p logs user
+# (Doa4App::OnConfigurePaths), and the package doesn't carry it. Without it they'd go elsewhere
+# and seem lost once it's there, so no start then.
+if ! mkdir -p logs user; then
+  echo "Can't create logs/ and user/ in $here" >&2
+  exit 1
+fi
 stamp="$(date +%Y%m%d-%H%M%S)"
 info="$here/logs/system-$stamp.txt"
 program=doa4

@@ -236,25 +236,34 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
 - **Scripts** (from graw360-recomp via doax2-360-recomp, which builds and runs natively in WSL2):
   `tools/setup-linux.sh`, `tools/build-linux.sh`, `tools/build-deck.sh` (Ubuntu 22.04 container
   `tools/linux/deck.Containerfile`, podman, glibc 2.35 at most), and `tools/steamdeck/`:
-  `make_linux_package.sh` (`--deck deck@steamdeck`, `--with-game` copies `port/assets` the first
-  time), `doa4-linux.sh` (the launcher), `doa4.toml` (fullscreen, 720p, `resolution_scale = 1`,
+  `make_linux_package.sh` (`--deck deck@steamdeck`; `--with-game` copies `port/assets` until a
+  copy has finished, marked by `.game-complete` beside `game/`), `doa4-linux.sh` (the launcher,
+  which stops if it can't create `user/`), `doa4.toml` (fullscreen, 720p, `resolution_scale = 1`,
   16x AF, the low-memory reservation on, log flush every second), `README-SteamDeck-Linux.txt`.
   The Deck folder is `~/recomps/DOA4-360-SteamDeck` (AGENTS.md).
 - **SDK:** the Windows tree 12884d9 (GRAW's set plus vexptefp-underflow, the same as GRAW's), then
-  seven Linux patches in their own commit, tree **c66e664** (built in WSL2 on 2026-10-29, both
-  tree checks passing): GRAW's four (`launch-title-path`,
+  seven Linux patches in their own commit, tree **ff9a4d1**: GRAW's four (`launch-title-path`,
   `linux-crash-renderdoc`, `linux-shm-unlink`, `linux-crash-watchdog`; GRAW's Linux tree f481d5e)
   and DOAX2's three for this engine: `bind-low-port` (system link's VDP socket binds port 1000,
   which Linux refuses to a normal user), `linux-socket-ioctl` (Winsock FIONBIO/FIONREAD and errno
   to WSA codes: DOAX2 drew no first frame without both) and `linux-fiber-destroy`. DOA4 imports
   the same socket calls (`NetDll_bind`, `ioctlsocket`, `recvfrom`, `sendto`, `WSAGetLastError`)
   and uses XAPI fibers, so these are expected to be needed; not yet proven for DOA4.
+  - Tree history: **c66e664** is what's built so far (WSL2 and the Deck, 2026-10-29, both tree
+    checks passing), with DOAX2's two socket patches as DOAX2 has them. PR #2's review narrowed
+    both (ff9a4d1, **not yet built**): the low ports are mapped only for peers on the local
+    network (broadcast, loopback, the private ranges, link-local), so a server elsewhere keeps
+    port 80 or 53; and `socket_ioctl` passes any command it doesn't translate to `ioctl`
+    unchanged again, as upstream did, instead of failing it. DOAX2 still has the earlier
+    versions. `setup-linux.sh` now swaps an older Linux-patch commit for the new one by itself
+    (no `--force`), so the rebuild keeps the build folder and recompiles only what changed.
 - **Host code:** already guarded for non-Windows (`crash_report.cpp`, `cpu_check.cpp`,
   `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. It built on
   Linux unchanged, with no compiler warnings. One gap from run 1: `ui_style.cpp` looked for the
   dialog font only in `C:\Windows\Fonts`, so on Linux the runtime's dialogs kept the SDK's 10 px
   font. It now tries Noto Sans (SteamOS's default sans; the Deck has it and DejaVu Sans) and
   DejaVu Sans at the Arch and Debian paths. In the Deck build (52e6f37); not yet seen running.
+  Ubuntu's Noto path (`truetype/noto`) was added after it, in review.
 - **WSL2** (Ubuntu 26.04, clang 21, CMake 4.2, podman): checkout `~/doa4-360-recomp`, cloned
   from the Windows checkout (its `origin`), with `port/assets` a link to the Windows checkout's;
   SDK in its `third_party/rexglue-sdk-bd833a2`; logs in `~/doa4-logs`. GRAW's and DOAX2's Linux
@@ -293,7 +302,9 @@ GLIBCXX_3.4.32. `make_linux_package.sh` made the 296 MB folder in `private/steam
   WSL's `tar` piped into Windows' ssh instead (executable bits kept, `doa4`'s hash matching), then
   `port/assets` into `game/` (59 files, 7.22 GB, 62 s; `default.xex`'s hash checked). The script
   now runs ssh with `BatchMode=yes` and checks the connection first, so a missing key stops it
-  at once with a message; SETUP.md says WSL needs its own key.
+  at once with a message; SETUP.md says WSL needs its own key. This copy predates the
+  `.game-complete` marker, so a later `--with-game` copies `game/` again unless the marker is
+  written there by hand (the copy was checked complete).
 - On the Deck (SteamOS 3.9.5, glibc 2.43, RADV VANGOGH): `ldd` finds every library for both
   programs, and its libstdc++ has GLIBCXX_3.4.32. Not run there yet.
 
@@ -303,7 +314,9 @@ GLIBCXX_3.4.32. `make_linux_package.sh` made the 296 MB folder in `private/steam
    with the disc's files. Next: the user's Deck run at 720p, through Steam (the folder's README)
    and the controller (PLAN.md M5: 60 fps in a 2-character fight or a measured list of what
    stops it); it also shows the dialog font. Its logs stay in the Deck folder's `logs/`: pull
-   them over SSH from Windows.
+   them over SSH from Windows. The Deck has the c66e664 build; the review fixes to the SDK
+   patches (tree ff9a4d1) and the font path need a WSL2 and a Deck rebuild, and the launcher's
+   `user/` check goes over by itself (not while the game runs: bash reads a script as it goes).
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
