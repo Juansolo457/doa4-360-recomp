@@ -6,9 +6,19 @@ state, the build/run detail and where things live. Update it at the end of every
 next model starts here, not from chat history.
 
 ## Where it stands
-**M1 reached (2026-10-29): menus, character select and full fights play at 60 fps, Ryu Hayabusa
-included since run 7** (his crash was an out-of-bounds read in the original game, now guarded).
-Open: Ryu's animations look wrong to the user. M0 is done (below).
+**M1 reached, M2 close (2026-10-29): menus, character select and full fights play at 60 fps,
+every character tried so far, Ryu Hayabusa included since run 9** (his scripts were left
+unrelocated because his file loaded at guest 0x10000; `src/low_memory.cpp` keeps that range
+free). The trace and the old guard are removed but that build is not yet run. M0 is done (below).
+
+### Run 9 (2026-10-29, low-memory reservation; `port/logs/smoke-20261029-104238.log`)
+**Ryu Hayabusa is fixed.** "DOA4: reserved guest 0x00010000-0x01000000" at start; his scripts
+start at 0x0101xxxx with real opcodes (`0002 000A 005A ...`, where run 8 read record data);
+hovering him shows the face close-up, a cut to the full body, then the upper body with the sword,
+as in the real game; in Watch he scores (71, 141, 240, 406, where runs 7-8 stayed at 0); the user
+then played a match against Kasumi (story intro, rounds, KO, replays) and reported it "played
+great". The guard never fired. 60.0 fps in every 10 s window, the game's 1280x720 shown in a
+2560x1440 window. The trace and the guard are removed (FINDINGS.md corrects the -256 reading).
 
 ### Run 8 (2026-10-29, animation trace; `port/logs/smoke-20261029-095748.log`)
 The user hovered Ryu, Kasumi, Hayate and others, then played Watch with Ryu against Kasumi, and
@@ -200,13 +210,14 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Build the low-memory experiment and rerun with Ryu** (needs the user's OK): hover Ryu,
-   then Watch Ryu against anyone. If it fixes him, find the relocation check in the code to
-   confirm the reason, then remove the trace and, if it never fires, the guard.
-2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
+1. **Build without the trace and guard, and try 4K** (needs the user's OK):
+   `tools/launch.ps1 -Windowed -Scale 3` renders at 3840x2160 (`--resolution_scale=3`); check
+   bloom, depth of field and the menus for scaling artefacts, and the frame rate.
+2. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
+3. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
-3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
-4. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
+4. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)
+5. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
 
 ## How it is built and run
 ```

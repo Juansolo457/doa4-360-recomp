@@ -27,8 +27,6 @@ set(DOA4_SOURCES
     src/frame_timing.cpp
     src/cpu_check.cpp
     src/fpscr_guard.cpp
-    src/anim_id_guard.cpp
-    src/anim_trace.cpp
     src/low_memory.cpp
 )
 

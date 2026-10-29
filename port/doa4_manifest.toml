@@ -188,42 +188,6 @@ address = 0x82A1343C
 registers = []
 
 
-# Out-of-bounds read in the original game (src/anim_id_guard.cpp): sub_82372840 indexes an
-# animation table with a signed bound check only, and Ryu Hayabusa's motion script passes -256.
-# The read lands on an uncommitted page here. Drop negative IDs the way the original drops
-# out-of-range ones.
-[[entrypoint.midasm_hook]]
-name = "Doa4GuardAnimId"
-address = 0x823729B0
-registers = ["r5", "r28"]
-jump_address_on_true = 0x82372B14
-
-# Diagnostic for run 7's select-screen fault (src/anim_trace.cpp). Remove once understood.
-[[entrypoint.midasm_hook]]
-name = "Doa4TraceScriptOp"
-address = 0x8240D390
-registers = ["r4", "r29"]
-
-[[entrypoint.midasm_hook]]
-name = "Doa4TraceSetId"
-address = 0x82373680
-registers = ["r3", "r4", "r5", "r6"]
-
-[[entrypoint.midasm_hook]]
-name = "Doa4TraceSetSpecial"
-address = 0x82372D78
-registers = ["r3", "r4", "r6"]
-
-[[entrypoint.midasm_hook]]
-name = "Doa4TraceGate"
-address = 0x82372868
-registers = ["r10", "r28"]
-
-[[entrypoint.midasm_hook]]
-name = "Doa4TraceApply"
-address = 0x823728D4
-registers = ["r7", "r11", "r28", "r31"]
-
 # XAPI's fibers, bound before the first run (DOAX2 crashed 2 s in without them: translated code
 # can't switch stacks). Identified 2026-10-29 from the code, the same layout as DOAX2's XAPI and the
 # SDK's X_FIBER_CONTEXT: ConvertThreadToFiber fails with 1280 (ERROR_ALREADY_FIBER), allocates

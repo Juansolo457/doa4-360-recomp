@@ -112,30 +112,15 @@ nothing on the boot path. Notable imports: the full XMA context set (hardware au
   E_POINTER 0x80004003 if the object is null, else jump through vtable slot 12 / 16), already
   registered.
 
-### The negative animation ID in Ryu Hayabusa's script (runs 2-6, 2026-10-29)
-A bug in the original game that the console hides. Guarded by `src/anim_id_guard.cpp`.
-- **The motion-script interpreter** is `sub_8240CE58`: dispatch at 0x8240D390 on the halfword at
-  the player's stream pointer, a 160-entry jump table at 0x8240D3BC (the generated switch matches
-  it), sub-tables for 0x6801-0x6805 and above 0x6900. Halfwords with no case go to `sub_82423A40`,
-  which looks them up in an {opcode, operand count} table at 0x82C51230 (118 entries, ended by -2)
-  and skips them, 2 bytes when not listed. The scripts are tagged records (`xx01 22yy` then
-  parameters) that the interpreter mostly walks 2 bytes at a time by design.
-- **The scripts** are `anm.afs`, one `<character>.bin` each (26 entries), with a 34-offset header.
-  Ryu's is entry 5, `ryu.bin`, 0x21504 bytes, loaded at guest 0x10000; the stream the interpreter
-  ran matched the file byte for byte.
-- **Opcode 20** takes one operand, a signed halfword ID, and calls `sub_82372CB0` (lr 0x8240DB64),
-  which stores it in the player's 580-byte request record at 0x8302BC98 through `sub_82373680`.
-  `sub_82372840` applies the request: IDs 0x2000-0x2FFF use the table at 0x82CE88F0, 0x4000-0x4FFF
-  and the rest the 8-entry table at 0x82CE86F8, 0x6000 is special. The bound check is signed only.
-- **Ryu's script passes 0xFF00** (`0014 FF00`, for example at file offsets 0x6104, 0x615C and 0x6B38),
-  so -256: the entry read is 0x82CE82D8, the float 100.0 (0x42C80000), and the game loads through it
-  and stores two words from there as animation stream pointers (`sub_823736E8`). Here 0x42C80000 is
-  not committed and the load faults. Only some of the -256 requests are applied (run 6 set three
-  and crashed on the third); later requests in a frame overwrite earlier ones.
-- **Not confirmed:** why the console survives. The game's XAPI heap allocates 64K pages
-  (`NtAllocateVirtualMemory` with 0x60000000, MEM_LARGE_PAGES | MEM_HEAP), which live from
-  0x40000000, so 0x42C80000 is likely committed there and the read returns heap data. The streams
-  may be facial animation hidden by Ryu's mask.
+### The negative animation ID (runs 2-6, superseded by run 9)
+Runs 2-6 crashed loading a fight with Ryu Hayabusa: opcode 20 of the motion-script interpreter
+passed the ID 0xFF00 (-256), `sub_82372840` indexed its 8-entry table at 0x82CE86F8 with a signed
+bound check only, read the float 100.0 (0x42C80000) 1 KB before it and loaded through it. The
+bytes were Ryu's `ryu.bin`, but **not his scripts**: they were section 8's records, run as a
+script because his script table was never relocated (below). Run 7's guard (drop negative IDs)
+stopped the crash but not the cause, and was removed once run 9 fixed the cause; with correct
+scripts no -256 ID appears. The earlier reading, an original-game bug the console's memory hides,
+was wrong.
 
 ### Ryu Hayabusa's unrelocated scripts (run 8, 2026-10-29)
 The likely root of every Ryu fault (the -256 ID, the select-screen warp, an AI that never attacks).
@@ -153,7 +138,11 @@ The likely root of every Ryu fault (the -256 ID, the select-screen warp, an AI t
   inside section 8's 16-byte records.
 - **Why only Ryu, likely:** a relocation that skips values that already look like pointers (at
   or above the base). With the base at 0x10000 Ryu's offsets 0x10598-0x21348 do; other files
-  load higher. Not yet confirmed in the code; the experiment is `src/low_memory.cpp`.
+  load higher. The check itself is not yet found in the code.
+- **Fixed (run 9):** `src/low_memory.cpp` reserves guest 0x10000-0x1000000 before the game starts,
+  so nothing loads that low, as on the console. Ryu's scripts then start at 0x0101xxxx with real
+  opcodes, his select sequence matches the real game (face, full body, upper body with the
+  sword), and he fights and scores.
 
 ### Emulator state
 Xenia Canary [game-compatibility #207](https://github.com/xenia-canary/game-compatibility/issues/207):
