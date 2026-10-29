@@ -12,7 +12,8 @@ unrelocated because his file loaded at guest 0x10000; `src/low_memory.cpp` keeps
 free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below). PR #1 (all of
 it, 1440p Windows default) was reviewed by CodeRabbit and merged on 2026-10-29. **Now: the native
 Linux build for the Steam Deck** (branch `linux-native`, below): the SDK and the game build in
-WSL2 and boot natively to the title screen (Linux run 1); the Deck build is next.
+WSL2 and boot natively to the title screen (Linux run 1); the Deck build is on the Deck, waiting
+for the user's first run there.
 
 ### Run 10 (2026-10-29, 4K internal: `--resolution_scale=3 --anisotropic_override=5`; `port/logs/smoke-20261029-104915.log`)
 First run of the build without the trace and guard, and the first at 4K: the renderer reports
@@ -230,8 +231,8 @@ decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Native Linux (2026-10-29, branch linux-native)
 The second stream (the user, 2026-10-29): a native build for the Steam Deck, no Proton or Wine,
-720p by default there. **Builds and boots to the title in WSL2 (Linux run 1, below); not yet
-built for or run on the Deck** (every build needs the user's OK).
+720p by default there. **Builds and boots to the title in WSL2 (Linux run 1, below); the Deck
+build is on the Deck, not yet run there** (every build needs the user's OK).
 - **Scripts** (from graw360-recomp via doax2-360-recomp, which builds and runs natively in WSL2):
   `tools/setup-linux.sh`, `tools/build-linux.sh`, `tools/build-deck.sh` (Ubuntu 22.04 container
   `tools/linux/deck.Containerfile`, podman, glibc 2.35 at most), and `tools/steamdeck/`:
@@ -253,7 +254,7 @@ built for or run on the Deck** (every build needs the user's OK).
   Linux unchanged, with no compiler warnings. One gap from run 1: `ui_style.cpp` looked for the
   dialog font only in `C:\Windows\Fonts`, so on Linux the runtime's dialogs kept the SDK's 10 px
   font. It now tries Noto Sans (SteamOS's default sans; the Deck has it and DejaVu Sans) and
-  DejaVu Sans at the Arch and Debian paths. Not yet built or run (needs the user's OK).
+  DejaVu Sans at the Arch and Debian paths. In the Deck build (52e6f37); not yet seen running.
 - **WSL2** (Ubuntu 26.04, clang 21, CMake 4.2, podman): checkout `~/doa4-360-recomp`, cloned
   from the Windows checkout (its `origin`), with `port/assets` a link to the Windows checkout's;
   SDK in its `third_party/rexglue-sdk-bd833a2`; logs in `~/doa4-logs`. GRAW's and DOAX2's Linux
@@ -282,13 +283,27 @@ cd port/out/build/linux-amd64-relwithdebinfo
 - PipeWire printed a missing `client.conf` on stdout (WSLg has no PipeWire config); harmless.
 - The dialog font gap above.
 
+### The Deck build (2026-10-29, commit 52e6f37; `~/doa4-logs/build-deck.log`)
+The user's OK. `tools/build-deck.sh`, then `--config Release`: the new `doa4-deck-build` image,
+its own SDK (`third_party/rexglue-sdk-bd833a2-deck`, tree c66e664) and both builds. The newest
+glibc any binary needs is 2.35 (`librexruntime`; `doa4` needs 2.34) and the newest libstdc++ is
+GLIBCXX_3.4.32. `make_linux_package.sh` made the 296 MB folder in `private/steamdeck/`.
+- Its `--deck` copy hung: WSL's `~/.ssh` has no key for the Deck (the passwordless key is
+  Windows'), so ssh waited at a password prompt no one could see. The folder went over with
+  WSL's `tar` piped into Windows' ssh instead (executable bits kept, `doa4`'s hash matching), then
+  `port/assets` into `game/` (59 files, 7.22 GB, 62 s; `default.xex`'s hash checked). The script
+  now runs ssh with `BatchMode=yes` and checks the connection first, so a missing key stops it
+  at once with a message; SETUP.md says WSL needs its own key.
+- On the Deck (SteamOS 3.9.5, glibc 2.43, RADV VANGOGH): `ldd` finds every library for both
+  programs, and its libstdc++ has GLIBCXX_3.4.32. Not run there yet.
+
 ## Next steps
-1. **Linux stream, with the user's OK for each build:** done in WSL2: the SDK, the build and
-   Linux run 1 (boots to the title). Next: rebuild with the dialog-font fix (`git pull` in
-   `~/doa4-360-recomp`, then `tools/build-linux.sh`); `tools/build-deck.sh` (RelWithDebInfo and
-   Release) and `tools/steamdeck/make_linux_package.sh --deck deck@steamdeck --with-game`; the
-   user's Deck run at 720p (PLAN.md M5: 60 fps in a 2-character fight or a measured list of what
-   stops it). The Deck run also shows the font at 1280x800.
+1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
+   in WSL2 (boots to the title), and the Deck build, copied to `~/recomps/DOA4-360-SteamDeck`
+   with the disc's files. Next: the user's Deck run at 720p, through Steam (the folder's README)
+   and the controller (PLAN.md M5: 60 fps in a 2-character fight or a measured list of what
+   stops it); it also shows the dialog font. Its logs stay in the Deck folder's `logs/`: pull
+   them over SSH from Windows.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.

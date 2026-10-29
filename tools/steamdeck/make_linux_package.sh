@@ -51,19 +51,27 @@ chmod +x "$out/doa4" "$out/doa4-relwithdebinfo" "$out/doa4-linux.sh"
 du -sh "$out"
 if [[ -n "$deck" ]]; then
   dest=recomps/DOA4-360-SteamDeck
-  ssh "$deck" "mkdir -p ~/$dest"
+  # Never a prompt: without a key the Deck accepts (or with its host key unknown), an ssh with
+  # no terminal waits for ever. In WSL that is WSL's own ~/.ssh, not Windows'.
+  ssh_opts=(-o BatchMode=yes -o ConnectTimeout=10)
+  if ! ssh "${ssh_opts[@]}" "$deck" true; then
+    echo "Can't reach $deck over SSH without a prompt: add a key it accepts (ssh-copy-id $deck)," \
+         "or copy $out to ~/$dest yourself" >&2
+    exit 1
+  fi
+  ssh "${ssh_opts[@]}" "$deck" "mkdir -p ~/$dest"
   # The programs and libraries; logs/, game/ and user/ on the Deck are left alone.
-  tar -C "$out" -cf - . | ssh "$deck" "tar -C ~/$dest -xf -"
+  tar -C "$out" -cf - . | ssh "${ssh_opts[@]}" "$deck" "tar -C ~/$dest -xf -"
   if [[ $with_game -eq 1 ]]; then
-    if ssh "$deck" "test -f ~/$dest/game/default.xex"; then
+    if ssh "${ssh_opts[@]}" "$deck" "test -f ~/$dest/game/default.xex"; then
       echo "The Deck has game/ already: not copied"
     else
       assets="$(readlink -f "$root/port/assets")"
       [[ -f "$assets/default.xex" ]] || { echo "port/assets/default.xex is missing" >&2; exit 1; }
       echo "Copying the disc's files to the Deck's game/ (about 6.8 GB)"
-      ssh "$deck" "mkdir -p ~/$dest/game"
-      tar -C "$assets" -cf - . | ssh "$deck" "tar -C ~/$dest/game -xf -"
+      ssh "${ssh_opts[@]}" "$deck" "mkdir -p ~/$dest/game"
+      tar -C "$assets" -cf - . | ssh "${ssh_opts[@]}" "$deck" "tar -C ~/$dest/game -xf -"
     fi
   fi
-  ssh "$deck" "cd ~/$dest && ls -la"
+  ssh "${ssh_opts[@]}" "$deck" "cd ~/$dest && ls -la"
 fi

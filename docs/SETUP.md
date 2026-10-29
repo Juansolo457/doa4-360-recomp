@@ -101,5 +101,9 @@ have. For the Steam Deck, `tools/build-deck.sh` (needs `podman`) does steps 3 an
 are built in), with its own SDK checkout and build folder, and checks every binary needs glibc
 2.35 at most. Then `tools/steamdeck/make_linux_package.sh --deck deck@steamdeck --with-game`
 copies the Deck folder to `~/recomps/DOA4-360-SteamDeck`, with your disc's files the first time.
-The folder's `README-SteamDeck-Linux.txt` says how to add it to Steam. On the Deck the game runs
+`--deck` needs an SSH key the Deck accepts on the machine the script runs on; in WSL2 that is
+WSL's own `~/.ssh`, not Windows' (`ssh-copy-id deck@steamdeck` once, with the Deck's password).
+Without one the script stops at the start and says so. Otherwise copy
+`private/steamdeck/DOA4-360-SteamDeck` yourself, with your disc's files in its `game/`. The
+folder's `README-SteamDeck-Linux.txt` says how to add it to Steam. On the Deck the game runs
 at **720p by default** (`doa4.toml`, `resolution_scale = 1`).
