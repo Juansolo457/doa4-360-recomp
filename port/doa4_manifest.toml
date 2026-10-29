@@ -151,7 +151,10 @@ registers = []
 # worker, MXCSR 0x8060 (every exception unmasked), in sub_8297D748 under the worker's callback
 # sub_82968368: the runtime never seeds that context. One hook at the callback's entry and one
 # before each of the image's six mtfsf (0x82794140 is generated twice: the fiber routine has two
-# entries).
+# entries). Evidence (round: after run 1, 2026-10-29): the callback address is the crash report's
+# stack; the six addresses are every instruction in .text and PSFD00 matching mtfsf (primary
+# opcode 63, extended opcode 711, mask 0xFC0007FE = 0xFC00058E), rescanned 2026-10-29 with the same
+# six results. Run 2 onwards: no C000008F, the audio worker runs.
 [[entrypoint.midasm_hook]]   # the audio worker's callback (the game's mixer), entered on an unseeded context
 name = "Doa4GuardFpscr"
 address = 0x82968368
