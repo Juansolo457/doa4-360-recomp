@@ -1,0 +1,19 @@
+# First-boot script (not yet run against the game): Start pressed through the warning screen,
+# the Sofdec intro and the title, then A every 3 s to accept the sign-in and storage prompts
+# (ui_pad.cpp turns A into Enter for the runtime's dialogs). B is never pressed.
+#   pwsh -NoProfile -File tools/smoke.ps1 -Seconds 120 -CaptureEvery 5 -Autopilot tools/autopilot/boot.txt
+# Times are guesses from DOAX2 (same engine: its title came at ~36 s whatever was pressed before);
+# fix them from the first run's log and captures.
+10.0 START
+15.0 START
+20.0 START
+25.0 START
+30.0 START
+35.0 START
+40.0 START
+45.0 A
+48.0 A
+51.0 A
+54.0 A
+57.0 A
+60.0 A

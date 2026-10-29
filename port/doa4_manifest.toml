@@ -1,0 +1,29 @@
+# Dead or Alive 4 (Xbox 360), Redump "Dead or Alive 4 (USA, Europe) (En,Ja,Fr,De,Es,It,Zh,Ko)
+# (Rev 1)": default.xex v0.0.0.9, title 544307D1, built 2006-02-14,
+# SHA-256 0dba23465e091a03c119a9fb06765ac9cd51e7c14cc22e2130f0c11bf28e7530 (tools/build.ps1 checks it).
+# Scaffold as `rexglue init` writes it (ReXGlue v0.10.0.24-dev.gbd833a2). Function hints go below
+# in rounds, each with a comment saying where it came from (codegen warnings,
+# tools/find_missed_functions.py, tools/check_switch_tables.py, tools/find_vcall_thunks.py).
+# Fix missing functions here, never in the generated code.
+#
+# Still to find before the first build (docs/PLAN.md, "Lessons applied", M0):
+#  - setjmp_address / longjmp_address: the MS CRT pair (f14-f31 at 0, r1 at 144, r13.. from 152);
+#    libjpeg's error exit longjmps (DOAX2's photo-album crash);
+#  - [entrypoint.rexcrt]: the XAPI fiber routines, if this build uses fibers as DOAX2 does
+#    (ConvertThreadToFiber fails with 1280, ConvertFiberToThread with 1281, CreateFiber,
+#    SwitchToFiber, DeleteFiber);
+#  - [[entrypoint.midasm_hook]] Doa4FrameMark just before the game's VdSwap call
+#    (src/frame_timing.cpp).
+
+[project]
+name = "doa4"
+sdk_version = "0.10.0"
+game_root = "assets"
+
+[entrypoint]
+file_path = "assets/default.xex"
+out_directory_path = "generated/default"
+includes = []
+
+[entrypoint.functions]
+# Round 1: after the first codegen run (not yet run; needs the user's OK).

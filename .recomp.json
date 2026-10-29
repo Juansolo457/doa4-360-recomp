@@ -1,0 +1,18 @@
+{
+  "$schema": "https://recomp.fyi/schema/v1.json",
+  "game": "Dead or Alive 4",
+  "wikidata": "Q2608796",
+  "system": "Xbox 360",
+  "type": "recomp",
+  "original": {
+    "region": "USA/Europe"
+  },
+  "project": "Dead or Alive 4 360 Recompiled",
+  "status": "in-progress",
+  "targets": ["Windows"],
+  "toolchain": "Rexglue",
+  "approach": "The 360 default.xex statically recompiled to x86-64 C++ with ReXGlue, a game-specific runtime standing in for the Xbox, drawn by the SDK's Xenos renderer on Vulkan only (no D3D12). Windows first, then native Linux and the Steam Deck.",
+  "notes": "Bootstrapped 2026-10-29 from the lotr-conquest-360-recomp shape with the Dead or Alive Xtreme 2 recomp's engine knowledge (same Team Ninja engine). First translation and build next. No game data included: bring your own Xbox 360 copy.",
+  "tags": ["vulkan", "steam-deck"],
+  "maintainers": [{ "name": "Juansolo457", "link": "https://github.com/Juansolo457" }]
+}
