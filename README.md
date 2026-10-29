@@ -22,8 +22,8 @@ Steam Deck, both on Vulkan.
 
 ## Status
 
-Bootstrapped 2026-10-29: repository, toolchain, Vulkan-only SDK and the disc tools are in place;
-the first translation and build are next. See [docs/HANDOFF.md](docs/HANDOFF.md).
+The game's code translates and builds clean on Windows (2026-10-29); the first run is next. See
+[docs/HANDOFF.md](docs/HANDOFF.md).
 
 - [docs/PLAN.md](docs/PLAN.md): goals, decisions, milestones, lessons from the sister projects
 - [docs/HANDOFF.md](docs/HANDOFF.md): current state, how things work, where things live

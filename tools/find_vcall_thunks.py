@@ -22,7 +22,9 @@ import struct
 import sys
 
 BASE = 0x82000000
-TEXT = (0x82150000, 0x813604)
+# .text of DOA4's default.xex (docs/FINDINGS.md, sections). Was Quake 4's range, copied unchanged
+# through lotr-conquest-360-recomp: set it from the image's own section table for each game.
+TEXT = (0x822F0000, 0x86EDFC)
 
 
 def main():

@@ -6,39 +6,68 @@ state, the build/run detail and where things live. Update it at the end of every
 next model starts here, not from chat history.
 
 ## Where it stands
-**M0 in progress (2026-10-29): bootstrapped, nothing translated or built yet.**
-- The repo is `../lotr-conquest-360-recomp`'s shape renamed (`lotrc` -> `doa4`, `LotrConquestApp`
-  -> `Doa4App`, `LOTRC_` cvars -> `DOA4_`, the XEX hash and title); LOTR's autopilot scripts
-  and game-specific docs were not copied. `tools/audit_repo.py` and `.gitignore` know DOA4's
-  formats (`.afs`, `.sfd`, `.xgs`, `.dic`, `.tpr`, `.mot`, `.ptc`; the MPEG program-stream
-  signature). `tools/test_audit_repo.py`: 4 passed.
-- The disc is extracted: `port/assets` (6.8 GB, 59 files), `default.xex` SHA-256 as in
-  FINDINGS.md. The decrypted image and import list were made in a scratch folder; redo them
-  into `private/xex/` with the `xexdump` line in FINDINGS.md when analysis starts.
-- `.coderabbit.yaml` written (from `../hunter-xbe-recomp`'s, with this repo's paths).
-- `port/doa4_manifest.toml` is the bare scaffold: **no function hints, no `setjmp`/`longjmp`,
-  no fiber hooks, no `Doa4FrameMark` hook yet** (its comment lists what to find).
-  `src/frame_timing.cpp` compiles but is never called until the VdSwap `midasm_hook` exists.
-- GitHub: https://github.com/Juansolo457/doa4-360-recomp, **public**, created 2026-10-29 with
-  the bootstrap commit on `master`; `master` locked as the sister repos (PR only, `audit`
-  required and strict, conversations resolved, admins included, no force push or delete); merge
-  commits kept, branches deleted on merge. The first `audit` run passed. CodeRabbit covers the
-  repo (the account's GitHub App installation lists it); PR #1 is its first review here.
-- **Not done:** codegen and the first build (need the user's OK). See "Next steps".
+**M0 done (2026-10-29): `doa4.exe` builds clean; it has never been run.** The first run needs
+the user's OK (it opens a window on their screen).
+
+`port/out/build/win-amd64-relwithdebinfo/doa4.exe` (52 MB) with `rexgpu-xenosrd.dll` and
+`rexruntimerd.dll` beside it, byte-identical to the Vulkan-only install's (SHA-256 checked). The
+renderer DLL imports no Direct3D 12 (its import table is the C runtime, Tracy and the runtime
+DLL; Vulkan is loaded at run time).
+
+Verified on the translation (final codegen, build 5):
+- codegen: no errors or warnings;
+- `check_switch_tables.py`: 826 switches, 5 flagged, all benign (FINDINGS.md "Switches"); 2
+  more were a code generator bug, fixed by overrides;
+- `check_vector_aliasing.py`: no vpkd3d128 hazards in 240,454 vector instructions;
+- `find_missed_functions.py`: at a fixed point (only the four dropped candidates remain);
+- `find_vcall_thunks.py`: 2 matches, both false positives (FINDINGS.md).
+
+Manifest rounds (`port/doa4_manifest.toml`; builds in `private/build-1..5.log`):
+1. three `b` targets "not in any function", each a function start right after the previous
+   function's last branch (0x8296EAC8, 0x82450CB0, 0x829CCF50);
+2. `doa4.exe` linked; one warning, "Unresolved b target 0x82793F80 from 0x827925E8": the fiber
+   context save/load routine behind SwitchToFiber's thunk, as in DOAX2's round 2 (its
+   0x82785670). Added with it, before any run: `setjmp_address`/`longjmp_address` (0x82A04560 /
+   0x82A04220, matched against DOAX2's pair over 24 instructions with immediates masked), the
+   five XAPI fiber routines in `[entrypoint.rexcrt]` (FINDINGS.md), and the `Doa4FrameMark`
+   midasm hook on the one VdSwap call (0x8275B0BC);
+3. clean; then the finder's 96 candidates wholesale and two switch overrides. Four candidates
+   split functions ("Unresolved" warnings) and were dropped (0x82330258, 0x827D5708, 0x829400E8,
+   0x82A0FC34); build 5 clean.
+
+**A code generator bug, new in this family** (FINDINGS.md "Switches"): where the index is a
+sign-extended halfword loaded from a table into r11, the generated switch reads r3, the value the
+table offset was built from. Two switches (sub_8251D328, sub_8251DA10), both overridden. Worth an
+upstream issue to ReXGlue with the two sites as examples.
+
+`find_vcall_thunks.py` had Quake 4's `.text` range hard-coded (0x82150000, 0x813604), unchanged
+through lotr-conquest-360-recomp; it now carries DOA4's (0x822F0000, 0x86EDFC). **LOTR's "0
+forwarders" ran on the wrong range** (it skipped the first 640 KB of LOTR's code and read past
+its end): rerun there with LOTR's own range.
+
+Repository: https://github.com/Juansolo457/doa4-360-recomp, **public**, created 2026-10-29 with
+the bootstrap commit on `master`. Branch protection read back from the GitHub API
+(`repos/Juansolo457/doa4-360-recomp/branches/master/protection`, 2026-10-29): `audit` required
+and strict, conversation resolution on, admins included, force pushes and deletion off. Merge
+commits kept, branches deleted on merge. The first `audit` run on `master` passed. CodeRabbit
+lists the repository in its dashboard (Repositories: doa4-360-recomp, Public) and reviewed PR #1.
+
+Bootstrap notes: the repo is `../lotr-conquest-360-recomp`'s shape renamed (`lotrc` -> `doa4`,
+`LotrConquestApp` -> `Doa4App`, `LOTRC_` cvars -> `DOA4_`, the XEX hash and title); LOTR's forced
+`readback_resolve=fast` was taken out (DOA4 starts on the SDK default and logs it). The audit and
+`.gitignore` know DOA4's formats (`.afs`, `.sfd`, `.xgs`, `.dic`, `.tpr`, `.mot`, `.ptc`, the MPEG
+program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 files); the
+decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Codegen round 1** (`tools/build.ps1`, with the user's OK): expect `b` targets "not in any
-   function" (leaf thunks) and possibly byte-indexed jump tables. After it:
-   `check_switch_tables.py` (the shader compiler is in this image), `find_missed_functions.py`
-   wholesale, `find_vcall_thunks.py`; drop any candidate that yields an "Unresolved" warning.
-2. **Before the first run:** find the MS CRT `setjmp`/`longjmp` (the layout is in the manifest
-   comment) and the five XAPI fiber routines (DOAX2 identified them by their error codes 1280 and
-   1281 and the 0xA50 context at KTHREAD+0x164); bind both in the manifest. Find the game's
-   `VdSwap` call site for `Doa4FrameMark`.
-3. **First smoke run** (`tools/smoke.ps1 -Seconds 60 -CaptureEvery 5`, headless, the user's OK):
-   expect the warning screen, the Sofdec intro, the title. Then `tools/autopilot/boot.txt` with
-   the real timings filled in.
-4. Every later change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
+1. **First smoke run** (`tools/smoke.ps1 -Seconds 60 -CaptureEvery 5`, headless; the user's OK
+   first): expect the warning screen, the Sofdec intro, the title. Watch for "Call to invalid or
+   unregistered function" (a missed entry: the next manifest round), fiber activity
+   (ConvertThreadToFiber / CreateFiber), FPSCR faults on the audio worker (`fpscr_guard.cpp` is
+   linked but not hooked), and the frame log ("DOA4 frames: ..." every 10 s from `Doa4FrameMark`).
+2. Then `tools/autopilot/boot.txt` with the real timings, into the main menu (M1).
+3. An upstream issue for the halfword-index switch bug; LOTR's `find_vcall_thunks.py` rerun.
+4. Every change on a branch and through a PR (CONTRIBUTING.md); CodeRabbit reviews it.
 
 ## How it is built and run
 ```

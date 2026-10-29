@@ -83,6 +83,35 @@ nothing on the boot path. Notable imports: the full XMA context set (hardware au
   XHV voice, achievements ("Let's play DEAD OR ALIVE 4 and get this Achievement!").
 - No Bink, Wwise, Havok, Scaleform or Lua.
 
+### Translation facts (ReXGlue `bd833a2`, 2026-10-29)
+- `.pdata` lists **15,073 functions** (0x822F0000 to 0x82B63E80). The code generator needed 3
+  tail-call targets, the fiber context routine and 92 finder candidates on top (the manifest).
+- **XAPI fibers**, the same code as DOAX2's XAPI (2640-byte context at KTHREAD+0x164):
+  `ConvertThreadToFiber` 0x827923C0 (fails with 1280), `ConvertFiberToThread` 0x82792450 (fails
+  with 1281), `CreateFiber` 0x827924A0, `DeleteFiber` 0x82792588 (converts back first when the
+  fiber is the current one), `SwitchToFiber` 0x827925E8 (a `b` to the register save/load at
+  0x82793F80: `mfcr`, LR, `std r14..` into the current context, then the next one's).
+- **setjmp** 0x82A04560 and **longjmp** 0x82A04220: the MS CRT pair (f14-f31 at 0, r1 at 144,
+  r13 onward from 152 as `std`), the same code as DOAX2's 0x829F12D0 / 0x829F1080 apart from
+  addresses. Called from three translation units.
+- **VdSwap** (xboxkrnl ordinal 603, thunk 0x82B5E81C) is called from one place, the `bl` at
+  0x8275B0BC: the frame hook.
+
+### Switches (`tools/check_switch_tables.py`, 826 in all)
+- **Code generator bug:** `sub_8251D328` (bctr 0x8251D3F4) and `sub_8251DA10` (bctr 0x8251DC0C)
+  compute the index as `lhzx r10,r11,rN; extsh r11,r10; cmplwi r11,N`, after `rlwinm r11,r3,1`
+  built the table offset from r3. The generated `switch` reads **r3**, not r11. Overridden in
+  the manifest with register 11 and the image's own labels.
+- Benign, checked by disassembly: `sub_824AF148`, `sub_824AF790` and `sub_824AFE60` have 8-entry
+  tables whose entries 2 and 6 point at the zero padding word after the function (an index the
+  console can't take either); in `sub_822F3178` index 4 branches away before the table; in
+  `sub_824BF230` two tables sit back to back and the checker pairs the second table with the
+  first's register.
+- `tools/find_vcall_thunks.py` matches at 0x82450C78 and 0x82450CA0 are not forwarders of their
+  own: each is the second half of a null-checking wrapper (`sub_82450C60`, `sub_82450C88`: return
+  E_POINTER 0x80004003 if the object is null, else jump through vtable slot 12 / 16), already
+  registered.
+
 ### Emulator state
 Xenia Canary [game-compatibility #207](https://github.com/xenia-canary/game-compatibility/issues/207):
 `state-playable`. No published static recompilation of this title was found (2026-10-29).
