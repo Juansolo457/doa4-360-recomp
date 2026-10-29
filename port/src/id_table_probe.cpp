@@ -16,6 +16,7 @@
 
 #include <rex/logging.h>
 #include <rex/ppc/context.h>
+#include <rex/ppc/stack.h>
 #include <rex/types.h>
 
 namespace {
@@ -31,4 +32,29 @@ void Doa4ProbeIdTable(PPCRegister& r4, PPCRegister& r5, PPCRegister& r6, PPCRegi
       "DOA4 probe: id table entry 0x{:08X} is not a pointer: id 0x{:08X} ({}), index {}, "
       "count {}, array 0x{:08X}, player {}",
       entry, r11.u32, r11.s32, r5.s32, r6.s32, r4.u32, r28.u32);
+}
+
+// Run 3 (2026-10-29) showed the ID is -256 (0xFFFFFF00) with the table intact. The only setter
+// that takes a caller's ID, sub_82373680, is reached through sub_82372CB0, and its 7 call sites
+// all pass a sign-extended halfword, so 0xFF00 came from game data. Doa4ProbeIdSource runs at
+// sub_82372CB0's entry and logs every negative ID with the return address (the call site) and the
+// caller's stack word 196(r1), which holds the halfword array in sub_8240CE58's two lhzx sites.
+namespace {
+std::atomic<uint32_t> g_source_reports{0};
+
+uint32_t LoadGuestU32(uint32_t address) {
+  const uint8_t* p = rex::ppc::detail::current_base() + address;
+  return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+}
+}  // namespace
+
+void Doa4ProbeIdSource(PPCRegister& r1, PPCRegister& r3, PPCRegister& r4, PPCRegister& r5,
+                       PPCRegister& r6) {
+  if (r4.s32 >= 0) return;
+  if (g_source_reports.fetch_add(1) >= 32) return;
+  const PPCContext& ctx = rex::ppc::detail::current_ctx();
+  REXLOG_ERROR(
+      "DOA4 probe: negative id 0x{:08X} ({}) set from lr 0x{:08X}: r3 {} r5 {} r6 {}, "
+      "caller 196(r1) 0x{:08X}",
+      r4.u32, r4.s32, uint32_t(ctx.lr), r3.s32, r5.s32, r6.s32, LoadGuestU32(r1.u32 + 196));
 }

@@ -6,9 +6,24 @@ state, the build/run detail and where things live. Update it at the end of every
 next model starts here, not from chat history.
 
 ## Where it stands
-**M1 nearly there (2026-10-29): run 2 reaches the main menus, Sparring and character select at
-the game's 60 fps, then crashes on the Now Loading screen into the first fight.** A probe for that
-crash is in the manifest, not yet built. M0 is done (below).
+**M1 nearly there (2026-10-29): runs 2 and 3 reach the main menus, Sparring and character select at
+the game's 60 fps, then crash on the Now Loading screen into the first fight.** Run 3's probe showed
+the cause is an out-of-range ID (-256); a second probe for where it comes from is in the
+manifest, not yet built. M0 is done (below).
+
+### Run 3 (2026-10-29, ID-table probe built; `port/logs/smoke-20261029-080319.log`)
+The user drove the pad into Sparring again. 60 fps throughout, then the same crash at +68 s on
+Now Loading. **The probe answered:** the ID in player 0's field 4 is **0xFFFFFF00 (-256)**, index
+-256 into the 8-entry table at 0x82CE86D8. The table is intact; the index is out of range.
+- **Where the ID comes from:** `sub_82373680` is the setter (`stw r4,4(r11)`). Of its 3 callers,
+  only `sub_82372CB0` passes a caller's ID; the other two pass 0. `sub_82372CB0` has 7 call sites
+  (`sub_8241FFE0`, `sub_823802A0`, `sub_8240CE58` x3, `sub_823F9418`, `sub_823F9E48`), and every one
+  sign-extends a halfword (`extsh`), as the original code does. So the value is the halfword 0xFF00
+  from game data, or data we loaded or swapped wrong. Not yet known which.
+- **Second probe (not built):** `Doa4ProbeIdSource` at `sub_82372CB0`'s entry logs every negative
+  ID with the return address (which call site) and the caller's 196(r1), the halfword array of
+  `sub_8240CE58`'s two `lhzx` sites. `lr` comes from the thread's guest context, since midasm
+  hooks only take registers.
 
 ### Run 2 (2026-10-29, FPSCR hooks built; `port/logs/smoke-20261029-063849.log`)
 Captures in `private/captures/doa4-20261029-063849/`, contact sheet `private/captures/run2-sheet.png`.
@@ -30,7 +45,7 @@ Captures in `private/captures/doa4-20261029-063849/`, contact sheet `private/cap
   with no 100.0 just before either array; 100.0 words sit about 120 slots before, in
   neighbouring tables. The bound check is a signed compare, so a negative or wrong ID would read
   there; the other reading is that something overwrote the table at run time. Unproven.
-- **Probe (built next):** `src/id_table_probe.cpp`, a midasm hook just after the entry load
+- **Probe (built in run 3):** `src/id_table_probe.cpp`, a midasm hook just after the entry load
   (0x823729BC), logs every non-pointer entry with the ID, index, count, array and player slot.
 
 ### Run 1 (2026-10-29, the user's OK; `port/logs/smoke-20261029-063237.log`)
@@ -104,9 +119,9 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Rebuild with the ID-table probe and rerun into a fight** (both need the user's OK): the
-   probe's log line says whether the ID is out of range or the table was overwritten. Then the
-   fix (an ID source bug, or a write that hits the table), and the probe comes out.
+1. **Rebuild with the call-site probe and rerun into a fight** (both need the user's OK): its log
+   line names the call site that passes -256 and, for `sub_8240CE58`, the halfword array. Then
+   trace that halfword to its file or writer, fix the cause, and take both probes out.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
 3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)

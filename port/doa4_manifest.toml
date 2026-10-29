@@ -195,6 +195,13 @@ name = "Doa4ProbeIdTable"
 address = 0x823729BC
 registers = ["r4", "r5", "r6", "r8", "r11", "r28"]
 
+# Diagnostic for run 3's finding (src/id_table_probe.cpp): sub_82372CB0's entry, where a caller's
+# sign-extended halfword becomes the player's ID. Logs negative IDs with the call site.
+[[entrypoint.midasm_hook]]
+name = "Doa4ProbeIdSource"
+address = 0x82372CB0
+registers = ["r1", "r3", "r4", "r5", "r6"]
+
 # XAPI's fibers, bound before the first run (DOAX2 crashed 2 s in without them: translated code
 # can't switch stacks). Identified 2026-10-29 from the code, the same layout as DOAX2's XAPI and the
 # SDK's X_FIBER_CONTEXT: ConvertThreadToFiber fails with 1280 (ERROR_ALREADY_FIBER), allocates
