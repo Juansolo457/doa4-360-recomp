@@ -7,9 +7,23 @@ next model starts here, not from chat history.
 
 ## Where it stands
 **M1 nearly there (2026-10-29): runs 2 and 3 reach the main menus, Sparring and character select at
-the game's 60 fps, then crash loading a fight with Ryu Hayabusa; run 4 played a full fight with Kasumi.** Run 3's probe showed
-the cause is an out-of-range ID (-256); a second probe for where it comes from is in the
-manifest, not yet built. M0 is done (below).
+the game's 60 fps, then crash loading a fight with Ryu Hayabusa; run 4 played a full fight with Kasumi.** The
+cause is an out-of-bounds read in the original game, an ID of -256 in Ryu's animation script;
+a guard for it is in the manifest, not yet built. M0 is done (below).
+
+### Run 6 (2026-10-29, script-dispatch probe, Ryu as player 1; `port/logs/smoke-20261029-085747.log`)
+Same crash. **The dump settled it:** the stream the interpreter ran is Ryu's `ryu.bin` from
+`anm.afs` (not `mot.afs`), loaded at guest 0x10000, byte for byte, and the walk is in step with
+the format (tagged records the interpreter skips 2 bytes at a time by design, via an opcode-length
+table). Opcode 20 really carries 0xFF00 in Ryu's data: **a bug in the original game**, an
+out-of-bounds read the console survives. Full write-up in FINDINGS.md, "The negative animation
+ID in Ryu Hayabusa's script".
+- **The fix (not built):** the three probes are gone; `src/anim_id_guard.cpp` hooks 0x823729B0,
+  just after the signed bound check, and jumps to 0x82372B14 for a negative index, the original's
+  own path for an out-of-range ID or a null entry. It logs the first 4 drops ("DOA4: dropped
+  animation ID ...").
+- **Not confirmed:** why the console survives (likely: the page is committed in the game's 64K-page
+  heap and the read returns heap data) and whether these streams are Ryu's face (masked).
 
 ### Run 5 (2026-10-29, Ryu as player 1, 180 s; `port/logs/smoke-20261029-082927.log`)
 Same crash (`crash-20261029-083044.txt`). **The call-site probe named the source:** lr
@@ -146,11 +160,9 @@ program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 fi
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
 ## Next steps
-1. **Rebuild with the script-dispatch probe and rerun with Ryu as player 1, 180 s** (needs the
-   user's OK): the dump shows the opcodes before the bad one. If the stream is out of step, find
-   the handler that consumed the wrong number of bytes (a translation bug); if it lines up with
-   `ryu.mot`, the console must have 0x42C80000 mapped, so look at the game's allocations. Then
-   fix it and take all three probes out.
+1. **Rebuild with the animation-ID guard and play a fight with Ryu Hayabusa** (needs the user's
+   OK): expect "DOA4: dropped animation ID -256" in the log, no crash, and Ryu looking right.
+   Then a few other characters, to see nothing else reads past a table.
 2. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
 3. An upstream issue for the halfword-index switch bug. (LOTR's `find_vcall_thunks.py` rerun is done: lotr-conquest-360-recomp PR #2, still 0 forwarders.)

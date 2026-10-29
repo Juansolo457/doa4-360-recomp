@@ -112,6 +112,31 @@ nothing on the boot path. Notable imports: the full XMA context set (hardware au
   E_POINTER 0x80004003 if the object is null, else jump through vtable slot 12 / 16), already
   registered.
 
+### The negative animation ID in Ryu Hayabusa's script (runs 2-6, 2026-10-29)
+A bug in the original game that the console hides. Guarded by `src/anim_id_guard.cpp`.
+- **The motion-script interpreter** is `sub_8240CE58`: dispatch at 0x8240D390 on the halfword at
+  the player's stream pointer, a 160-entry jump table at 0x8240D3BC (the generated switch matches
+  it), sub-tables for 0x6801-0x6805 and above 0x6900. Halfwords with no case go to `sub_82423A40`,
+  which looks them up in an {opcode, operand count} table at 0x82C51230 (118 entries, ended by -2)
+  and skips them, 2 bytes when not listed. The scripts are tagged records (`xx01 22yy` then
+  parameters) that the interpreter mostly walks 2 bytes at a time by design.
+- **The scripts** are `anm.afs`, one `<character>.bin` each (26 entries), with a 34-offset header.
+  Ryu's is entry 5, `ryu.bin`, 0x21504 bytes, loaded at guest 0x10000; the stream the interpreter
+  ran matched the file byte for byte.
+- **Opcode 20** takes one operand, a signed halfword ID, and calls `sub_82372CB0` (lr 0x8240DB64),
+  which stores it in the player's 580-byte request record at 0x8302BC98 through `sub_82373680`.
+  `sub_82372840` applies the request: IDs 0x2000-0x2FFF use the table at 0x82CE88F0, 0x4000-0x4FFF
+  and the rest the 8-entry table at 0x82CE86F8, 0x6000 is special. The bound check is signed only.
+- **Ryu's script passes 0xFF00** (`0014 FF00`, for example at file offsets 0x6104, 0x615C and 0x6B38),
+  so -256: the entry read is 0x82CE82D8, the float 100.0 (0x42C80000), and the game loads through it
+  and stores two words from there as animation stream pointers (`sub_823736E8`). Here 0x42C80000 is
+  not committed and the load faults. Only some of the -256 requests are applied (run 6 set three
+  and crashed on the third); later requests in a frame overwrite earlier ones.
+- **Not confirmed:** why the console survives. The game's XAPI heap allocates 64K pages
+  (`NtAllocateVirtualMemory` with 0x60000000, MEM_LARGE_PAGES | MEM_HEAP), which live from
+  0x40000000, so 0x42C80000 is likely committed there and the read returns heap data. The streams
+  may be facial animation hidden by Ryu's mask.
+
 ### Emulator state
 Xenia Canary [game-compatibility #207](https://github.com/xenia-canary/game-compatibility/issues/207):
 `state-playable`. No published static recompilation of this title was found (2026-10-29).

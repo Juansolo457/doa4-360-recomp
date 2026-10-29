@@ -188,26 +188,15 @@ address = 0x82A1343C
 registers = []
 
 
-# Diagnostic for run 2's crash (src/id_table_probe.cpp): just after the entry load in
-# sub_82372840's ID table lookup. Remove once the cause is known.
+# Out-of-bounds read in the original game (src/anim_id_guard.cpp): sub_82372840 indexes an
+# animation table with a signed bound check only, and Ryu Hayabusa's motion script passes -256.
+# The read lands on an uncommitted page here. Drop negative IDs the way the original drops
+# out-of-range ones.
 [[entrypoint.midasm_hook]]
-name = "Doa4ProbeIdTable"
-address = 0x823729BC
-registers = ["r4", "r5", "r6", "r8", "r11", "r28"]
-
-# Diagnostic for run 3's finding (src/id_table_probe.cpp): sub_82372CB0's entry, where a caller's
-# sign-extended halfword becomes the player's ID. Logs negative IDs with the call site.
-[[entrypoint.midasm_hook]]
-name = "Doa4ProbeIdSource"
-address = 0x82372CB0
-registers = ["r1", "r3", "r4", "r5", "r6"]
-
-# Diagnostic for run 5's finding: the motion-script interpreter's dispatch in sub_8240CE58
-# (r4 = stream, r11 = opcode, r29 = player). Feeds Doa4ProbeIdSource's dump.
-[[entrypoint.midasm_hook]]
-name = "Doa4ProbeScriptOp"
-address = 0x8240D390
-registers = ["r4", "r11", "r29"]
+name = "Doa4GuardAnimId"
+address = 0x823729B0
+registers = ["r5", "r28"]
+jump_address_on_true = 0x82372B14
 
 # XAPI's fibers, bound before the first run (DOAX2 crashed 2 s in without them: translated code
 # can't switch stacks). Identified 2026-10-29 from the code, the same layout as DOAX2's XAPI and the
