@@ -15,7 +15,8 @@ and LICENSES/. Copied BSD code keeps its own terms: it isn't relicensed as MIT.
      produced by `rexglue init` from the ReXGlue SDK (https://github.com/rexglue/rexglue-sdk,
      BSD-3-Clause, derived in part from Xenia). This is SDK build scaffolding, not a translation
      of game code.
-   - tools/patches/*.patch are changes to the SDK (from graw360-recomp; tools/patches/pgr4-native/
+   - tools/patches/*.patch are changes to the SDK (from graw360-recomp; bind-low-port,
+     linux-socket-ioctl and linux-fiber-destroy from doax2-360-recomp; tools/patches/pgr4-native/
      from pgr4-native, https://github.com/shaunsingh/pgr4-native), under the SDK's BSD-3-Clause
      license; their context lines are ReXGlue and Xenia code.
    - third_party/rexglue-sdk-bd833a2 (not tracked) is ReXGlue's source with those patches; its

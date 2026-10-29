@@ -9,7 +9,9 @@ next model starts here, not from chat history.
 **M1 reached, M2 close (2026-10-29): menus, character select and full fights play at 60 fps,
 every character tried so far, Ryu Hayabusa included since run 9** (his scripts were left
 unrelocated because his file loaded at guest 0x10000; `src/low_memory.cpp` keeps that range
-free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below).
+free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below). PR #1 (all of
+it, 1440p Windows default) was reviewed by CodeRabbit and merged on 2026-10-29. **Now: the native
+Linux build for the Steam Deck** (branch `linux-native`, below): scripts written, nothing built.
 
 ### Run 10 (2026-10-29, 4K internal: `--resolution_scale=3 --anisotropic_override=5`; `port/logs/smoke-20261029-104915.log`)
 First run of the build without the trace and guard, and the first at 4K: the renderer reports
@@ -225,12 +227,42 @@ Bootstrap notes: the repo is `../lotr-conquest-360-recomp`'s shape renamed (`lot
 program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 files); the
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
+## Native Linux (2026-10-29, branch linux-native)
+The second stream (the user, 2026-10-29): a native build for the Steam Deck, no Proton or Wine,
+720p by default there. **Written, not built or run yet** (every build needs the user's OK).
+- **Scripts** (from graw360-recomp via doax2-360-recomp, which builds and runs natively in WSL2):
+  `tools/setup-linux.sh`, `tools/build-linux.sh`, `tools/build-deck.sh` (Ubuntu 22.04 container
+  `tools/linux/deck.Containerfile`, podman, glibc 2.35 at most), and `tools/steamdeck/`:
+  `make_linux_package.sh` (`--deck deck@steamdeck`, `--with-game` copies `port/assets` the first
+  time), `doa4-linux.sh` (the launcher), `doa4.toml` (fullscreen, 720p, `resolution_scale = 1`,
+  16x AF, the low-memory reservation on, log flush every second), `README-SteamDeck-Linux.txt`.
+  The Deck folder is `~/recomps/DOA4-360-SteamDeck` (AGENTS.md).
+- **SDK:** the Windows tree 12884d9 (GRAW's set plus vexptefp-underflow, the same as GRAW's), then
+  seven Linux patches in their own commit, tree **c66e664** (applied and checked with a scratch
+  index, 2026-10-29; no SDK built yet): GRAW's four (`launch-title-path`,
+  `linux-crash-renderdoc`, `linux-shm-unlink`, `linux-crash-watchdog`; GRAW's Linux tree f481d5e)
+  and DOAX2's three for this engine: `bind-low-port` (system link's VDP socket binds port 1000,
+  which Linux refuses to a normal user), `linux-socket-ioctl` (Winsock FIONBIO/FIONREAD and errno
+  to WSA codes: DOAX2 drew no first frame without both) and `linux-fiber-destroy`. DOA4 imports
+  the same socket calls (`NetDll_bind`, `ioctlsocket`, `recvfrom`, `sendto`, `WSAGetLastError`)
+  and uses XAPI fibers, so these are expected to be needed; not yet proven for DOA4.
+- **Host code:** already guarded for non-Windows (`crash_report.cpp`, `cpu_check.cpp`,
+  `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. No change
+  made; the first Linux build will show what is missing.
+- **WSL2** (Ubuntu 26.04, clang 21, CMake 4.2, podman): no DOA4 checkout or SDK there yet. GRAW's
+  and DOAX2's Linux SDKs are other trees (GRAW's host 379fa50, its Deck f481d5e; DOAX2's fc48868),
+  so DOA4 builds its own (about an hour). The `doa4-deck-build` image is the same Containerfile as
+  the existing `doax2-deck-build`, so podman's layer cache should make it quick.
+
 ## Next steps
-1. **Windows stream:** PR #1 (all of M0-M1, Ryu's fix, 1440p default) through CodeRabbit's
-   review, every thread resolved, then merged. 1440p is the launcher default (the user,
-   2026-10-29); M2 checks (more characters, Story, Survival, the critical-hit flash at scale 1).
-2. **Then the Linux stream:** the native Linux build for the Steam Deck (PLAN.md M5), 720p by
-   default, no Proton package first.
+1. **Linux stream, with the user's OK for each build:** a DOA4 checkout in WSL2 on the Linux file
+   system (branch `linux-native`, `port/assets` linked to the Windows one); `tools/setup-linux.sh`
+   then `tools/build-linux.sh` and a first native run (WSL's GPU or llvmpipe); then
+   `tools/build-deck.sh` (RelWithDebInfo and Release) and `tools/steamdeck/make_linux_package.sh
+   --deck deck@steamdeck --with-game`; the user's Deck run at 720p (PLAN.md M5: 60 fps in a
+   2-character fight or a measured list of what stops it).
+2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
+   scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
 4. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
@@ -280,6 +312,8 @@ pwsh -NoProfile -File tools/launch.ps1 -Windowed          # a window on the user
 | `port/doa4_manifest.toml` | function hints and hooks for the code generator |
 | `port/src/` | host code: `doa4_app.h` (Vulkan plugin by name, paths, controllers), `crash_report`, `frame_timing`, `fpscr_guard`, `autopilot`, `ui_pad`, `ui_style`, `audio_dump`, `timer_resolution`, `cpu_check` |
 | `tools/patches/` | the SDK patch set `setup.ps1` applies (shared with the sister repos) |
+| `tools/setup-linux.sh`, `build-linux.sh`, `build-deck.sh`, `tools/linux/` | the native Linux and Deck builds (above, "Native Linux"); the seven `linux_patches` in `tools/patches/` |
+| `tools/steamdeck/` | the Deck folder: launcher, `doa4.toml` (720p), README, `make_linux_package.sh` |
 | `tools/autopilot/` | pad scripts for `smoke.ps1 -Autopilot` (`boot.txt`, timings unverified) |
 | `private/` | local only: decrypted image (`xex/`), captures, logs, Deck packages |
 | `docs/` | PLAN, HANDOFF (this), FINDINGS, SETUP |
