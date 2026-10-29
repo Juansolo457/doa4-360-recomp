@@ -1,5 +1,5 @@
 diff --git a/src/core/socket_posix.cpp b/src/core/socket_posix.cpp
-index b4b885a..731079c 100644
+index b4b885a..f0e52ef 100644
 --- a/src/core/socket_posix.cpp
 +++ b/src/core/socket_posix.cpp
 @@ -3,17 +3,58 @@
@@ -19,6 +19,7 @@ index b4b885a..731079c 100644
 +// ioctl has its own codes (FIONBIO is 0x5421, not 0x8004667E) and reads a host int. Passed
 +// through unchanged, the call failed, so a game's non-blocking socket stayed blocking and its
 +// recvfrom waited for ever (doax2-360-recomp: system link's socket, no first frame on Linux).
++// Any other command goes to ioctl as it is, as before.
 +constexpr uint32_t kWinsockFionbio = 0x8004667E;
 +constexpr uint32_t kWinsockFionread = 0x4004667F;
 +
@@ -40,7 +41,7 @@ index b4b885a..731079c 100644
  int socket_ioctl(SocketHandle handle, uint32_t cmd, uint8_t* arg) {
 -  return ioctl(static_cast<int>(handle), cmd, arg);
 +  const int fd = static_cast<int>(handle);
-+  if (!arg) {
++  if ((cmd == kWinsockFionbio || cmd == kWinsockFionread) && !arg) {
 +    errno = EFAULT;
 +    return -1;
 +  }
@@ -56,8 +57,7 @@ index b4b885a..731079c 100644
 +      return ret;
 +    }
 +    default:
-+      errno = EINVAL;
-+      return -1;
++      return ioctl(fd, cmd, arg);
 +  }
  }
  
