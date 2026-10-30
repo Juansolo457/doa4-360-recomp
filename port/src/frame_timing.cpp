@@ -29,6 +29,8 @@
 #include <dlfcn.h>
 #endif
 
+void Doa4LogIdleWaits(size_t frames, double window_s);  // idle_waits.cpp
+
 REXCVAR_DEFINE_STRING(doa4_frame_log, "", "DOA4",
                       "Write one CSV row per game frame (frame_time_us) to this file")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
@@ -72,6 +74,7 @@ void Summarise() {
       "{:.1f} fps, slowest {:.1f} ms; at 60 Hz vblank {:.0f}%, at 30 Hz {:.0f}%",
       s.size() / (total / 1e6), s.size(), median, 1000.0 / median, 1000.0 / low,
       s.back() / 1000.0, 100.0 * at60 / s.size(), 100.0 * at30 / s.size());
+  Doa4LogIdleWaits(s.size(), total / 1e6);
   g_window.clear();
 }
 
@@ -169,6 +172,7 @@ void Doa4FrameMark() {
   }
   if (g_last == Clock::time_point{}) {
     g_last = g_window_start = now;
+    Doa4LogIdleWaits(0, 0);  // count from the first frame
     return;
   }
   const auto us = std::chrono::duration_cast<std::chrono::microseconds>(now - g_last).count();

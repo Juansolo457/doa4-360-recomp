@@ -145,6 +145,44 @@ name = "Doa4FrameMark"
 address = 0x8275B0BC
 registers = []
 
+# Sleep instead of spinning (src/idle_waits.cpp; the Steam Deck's profile of a fight, HANDOFF "Deck
+# run 1" and "Deck run 2"). The job worker sub_823FC5A0: its loop's back edge (the b at 0x823FC648,
+# after it drops the ring's lock) and, in sub_823FC650, where a job has been posted (after the lock
+# is dropped, 0x823FC6F4). The game's Direct3D waits for the GPU, a fence (sub_8275A0B8) and room
+# in the command ring (sub_827598B0): where each wait starts (sub_8275A0B8's b into its loop at
+# 0x8275A14C, sub_827598B0's stw at 0x82759900) and before each poll through sub_82761AB8 (the bl
+# at 0x8275A154 and at 0x82759918). None of the addresses is a branch target (2026-10-30, from the
+# generated code's labels).
+[[entrypoint.midasm_hook]]   # the job worker's back edge; r30 = the ring
+name = "Doa4JobWorkerIdle"
+address = 0x823FC648
+registers = ["r30"]
+
+[[entrypoint.midasm_hook]]   # sub_823FC650 has posted a job
+name = "Doa4JobPosted"
+address = 0x823FC6F4
+registers = []
+
+[[entrypoint.midasm_hook]]   # sub_8275A0B8 (a fence): the wait starts
+name = "Doa4GpuWaitBegin"
+address = 0x8275A14C
+registers = []
+
+[[entrypoint.midasm_hook]]   # sub_8275A0B8: each poll
+name = "Doa4GpuWaitPoll"
+address = 0x8275A154
+registers = []
+
+[[entrypoint.midasm_hook]]   # sub_827598B0 (room in the command ring): the wait starts
+name = "Doa4GpuWaitBegin"
+address = 0x82759900
+registers = []
+
+[[entrypoint.midasm_hook]]   # sub_827598B0: each poll
+name = "Doa4GpuWaitPoll"
+address = 0x82759918
+registers = []
+
 
 # Keep FP exceptions masked (src/fpscr_guard.cpp, from graw360-recomp and quake4-360-recomp). The
 # first smoke run (2026-10-29, smoke-20261029-063237.log) died 12 s in with C000008F on the audio
