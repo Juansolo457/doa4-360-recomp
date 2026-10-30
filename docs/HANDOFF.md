@@ -490,6 +490,36 @@ The user's OK ("Write and build"): fix 3 and the register table.
   `doa4-prof.sh` is waiting for the game (unit `doa4-prof-053942`, into
   `~/recomps/doa4-prof/1030-053942/`).
 
+### Deck run 3 (2026-10-30, the user; Deck build 3, tree 282a60a; log `doa4_008.log`)
+Fights on the external display under `doa4-prof.sh` (`~/recomps/doa4-prof/1030-053942`), the
+manual GPU clock still at 1600 MHz. The user's report: much better, no freezes or slowdown. The
+numbers below were read at 05:56 with the session still running (11 minutes in); the perf
+reports come when it ends.
+- **60 fps, and no slide.** 56 of the 67 10-second windows average 59.5-60.1 fps and 7 more
+  57.6-59.4; the median frame is 16.6-16.7 ms in every fight window, and the last windows are as
+  fast as the first (run 2: 55.7 and 57.1 fps, sliding to ~55; run 1: 42-50).
+- **Four slower windows.** The first (55.6 fps) holds a 255 ms frame, the load into a fight. The
+  other three (05:47:02, 05:48:33, 05:54:03; 51.5-52.6 fps, 1% low ~27 fps) have the main thread
+  busier (54-57% against ~40%) and the command thread less (66-72%), fewer GPU waits than frames
+  (0.9 a frame), no jobs posted and nothing else in the log. They are also the only seconds the
+  APU went above 90 C. So something in the game's own frame costs more there (a round's end?);
+  not yet known.
+- **The threads** (`windows.txt`): the main thread 37-46% (about 100% in runs 1 and 2), the GPU
+  command thread 81-95% and the GPU 50-68% busy (28-56% in run 1); no other thread above ~18%.
+  The process uses about 1.8 cores, against about 3.5 in run 2, and the CPU still runs at
+  2.6-3.1 GHz.
+- **"DOA4 waits":** one GPU wait a frame, 8-11 ms of each 16.7 ms frame, so the main thread
+  finishes its part in about 6-8 ms and then waits for the frame's fence (the command thread and
+  the 60 Hz vblank set the pace); 40,000-57,000 sleeps per 10 s, about 85 a frame. The job
+  worker: 0-6 jobs and 4,860-4,944 sleeps per 10 s, nearly all its 2 ms fallback, so it sleeps.
+- **Heat:** the APU at 89 C at 05:56 and above 90 C for 18 seconds in all (93.6 at most, in the
+  three slow windows), against 335 fancontrol warnings up to 100 C over run 2's boot. The APU
+  drew 11 W at 05:56.
+- Next from it: the perf reports (which threads are left, the command thread's register writes
+  with the table), what the game does in the three slow windows, and CodeRabbit's review of
+  Deck build 3's commits (paused on the push; `@coderabbitai review` restarts it). The run with
+  the manual GPU clock off is now optional.
+
 ## Next steps
 1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
    in WSL2 (boots to the title), and the Deck build, copied to `~/recomps/DOA4-360-SteamDeck`
@@ -502,9 +532,10 @@ The user's OK ("Write and build"): fix 3 and the register table.
    the white PRESS START bar on every platform. The profile's first two fixes are on the Deck
    (Deck build 2). Deck run 2 (above): fights 55-57 fps, the APU at 91-99 C, sliding to ~55.
    Fix 3 (the job worker and the GPU waits sleep instead of spinning: about one and a half cores
-   of heat and power) and the register table are on the Deck (Deck build 3), with the profiler
-   waiting. Next: the user's fights under it (its "DOA4 waits" lines say how long the GPU waits
-   are), then a run with the user's manual GPU clock off.
+   of heat and power) and the register table are on the Deck (Deck build 3). Deck run 3 (above):
+   fights hold 60 fps with no slide, the main thread at ~40% and the APU mostly under 90 C. Next:
+   its perf reports, the three slow windows, CodeRabbit's review of build 3, then PR #2's merge
+   (the user's call); the white PRESS START bar is a renderer bug on every platform.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
