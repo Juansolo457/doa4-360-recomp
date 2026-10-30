@@ -9,10 +9,10 @@
   },
   "project": "Dead or Alive 4 360 Recompiled",
   "status": "in-progress",
-  "targets": ["Windows"],
+  "targets": ["Windows", "Linux", "Steam Deck"],
   "toolchain": "Rexglue",
-  "approach": "The 360 default.xex statically recompiled to x86-64 C++ with ReXGlue, a game-specific runtime standing in for the Xbox, drawn by the SDK's Xenos renderer on Vulkan only (no D3D12). Windows first, then native Linux and the Steam Deck.",
-  "notes": "Translates and builds clean on Windows (2026-10-29), with the Dead or Alive Xtreme 2 recomp's engine knowledge (same Team Ninja engine: XAPI fibers, setjmp/longjmp). First run next. No game data included: bring your own Xbox 360 copy.",
+  "approach": "The 360 default.xex statically recompiled to x86-64 C++ with ReXGlue: a game-specific runtime stands in for the Xbox, and the SDK's Xenos renderer draws on Vulkan only.",
+  "notes": "Plays at the console's 60 fps on Windows and natively on Linux and the Steam Deck (no Proton): menus, character select and full fights with every character tried, Survival included; up to 4K internal on PC, 720p on the Deck. Known: on the Deck a two- or three-second dip after a KO in Survival. Same Team Ninja engine as the Dead or Alive Xtreme 2 recomp. No version yet. No game data included: bring your own Xbox 360 copy.",
   "tags": ["vulkan", "steam-deck"],
   "maintainers": [{ "name": "Juansolo457", "link": "https://github.com/Juansolo457" }]
 }

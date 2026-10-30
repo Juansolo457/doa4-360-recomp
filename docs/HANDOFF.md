@@ -520,6 +520,59 @@ reports come when it ends.
   Deck build 3's commits (paused on the push; `@coderabbitai review` restarts it). The run with
   the manual GPU clock off is now optional.
 
+### Deck run 4 (2026-10-30, the user; Deck build 3, tree 282a60a; log `doa4_009.log`)
+Fights on the external display, 09:29-09:46, without the profiler. The user's report: really
+good; then something crashed on the way out of Gaming Mode and came back by itself. Steam's logs
+(`~/.local/share/Steam/logs/`), the journal and `coredumpctl` show two separate things, neither in
+the game's process.
+- **60 fps:** 98 of the 100 10-second windows average 59.5 fps or more, the lowest 58.2; none of
+  run 3's slower windows. One GPU wait a frame, 10-11.6 ms of each frame.
+- **Steam's UI froze after the quit.** The user quit through the Steam menu (`TerminateApp` at
+  09:46:06); the game shut down cleanly (`Title terminated; hard-exiting process`, exit status 0,
+  its scope gone at 09:46:07). Then Steam's UI stopped: nothing in `webhelper.txt` or
+  `webhelper_js.txt` for 50 s, and the APU went from under 90 C to 93-95 C, hotter than in the
+  fights. At 09:46:56 Steam's watchdog killed it (`killing unresponsive browser`; that is the
+  steamwebhelper core dump) and the UI was back at 09:47:02; the heat warnings stopped at
+  09:47:03. Deck run 2's last quit (22:30:16) has the same lines (`WasHidden 1`, `Invalid browser
+  dimensions: 0 x 0`, `WasHidden 0`) and then silence with the APU at 92-93 C; that time the Deck
+  was turned off two minutes later without a clean shutdown (run 2's "UI hang after quitting").
+  It is the only watchdog kill in Steam's logs since 2026-10-22, across F.E.A.R. (Linux), DOAX2
+  (Linux), DOAX3, LOTR, Halo and DOA4. After DOA4's other six Steam-menu quits the UI also took
+  7-21 s to log again, against 3-5 s after most quits of the other games (though F.E.A.R. and
+  LOTR have a few pauses of 40-84 s). The runtime exits with `std::_Exit(0)` straight after
+  `TerminateTitle` (`rex_app.cpp` `OnClosing`), with no swapchain or window teardown and the
+  command thread perhaps mid-frame; F.E.A.R. and DOAX2 exit the same way, so that alone isn't
+  it. Not known yet: what works that hard during the freeze, and why after DOA4.
+- **gamescope crashed on Switch to Desktop (09:47:14), not the game.** gamescope aborted in its
+  own shutdown (`double free or corruption`, in libseat and sd-bus under
+  `wl_event_loop_dispatch`) and Plasma started 5 s later. The same stack at run 3's end (05:58)
+  and at 22:39 on 2026-10-29, in a session where no game ran; the switches after F.E.A.R. and
+  Halo didn't crash. It is SteamOS 3.9.5's gamescope (minidumps in
+  `/var/lib/steamos-log-submitter/pending/minidump/`).
+- Run 3's perf reports and `windows.txt` are pulled (the session ended at 05:58), not yet read.
+- Next from it: a watcher on the Deck (`doa4-exitwatch.py`, started with `systemd-run --user`
+  like the profiler) that, for 150 s after each DOA4 exit, logs every second the GPU's load,
+  clock and power, the APU temperatures, the busiest threads of any process and where each Steam
+  UI and gamescope process waits; then a few quits through the Steam menu. Then decide whether a
+  gentler exit (wait for the GPU, release the swapchain and window before `_Exit`) is the fix.
+
+### Deck run 5 (2026-10-30, the user; Deck build 3, tree 282a60a; log `doa4_010.log`)
+Survival, several rounds, 12:53-13:04. The user's report: very good, no issues, the exit fine;
+the frame rate drops a little when a KO comes up.
+- **60 fps** in 59 of the 66 10-second windows; from 12:57:37 to the quit every window holds
+  60.0 fps with its slowest frame at 19-21 ms. One 210 ms frame as the first fight starts, like
+  run 4's 207 ms.
+- **The KO dips come with a second thread presenting.** Two pairs of windows dip, to 57.7 and
+  54.8 fps (12:54:37-47) and to 57.1 and 55.4 fps (12:55:57-56:07), each with a 1% low of 27 fps:
+  two or three seconds at 27-37 fps, not one long frame. In both, the frame summary comes from
+  another guest thread (t16257) instead of the main one (t16242), so the game presents from a
+  second thread while the main thread is busy; run 4's fights, without Survival, presented only
+  from the main thread. The GPU waits fall in those windows (52-53% of the time, against 60-69%),
+  so the time goes on the CPU side, not the GPU. Most likely Survival loading the next opponent
+  behind the KO; to confirm with the profiler during a Survival run.
+- **The quit was clean:** through Steam at 13:04:26, exit status 0, and Steam's UI logged again
+  2-3 s later, with no watchdog kill. Steam's UI has frozen after 2 of DOA4's 9 Steam-menu quits.
+
 ## Next steps
 1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
    in WSL2 (boots to the title), and the Deck build, copied to `~/recomps/DOA4-360-SteamDeck`
@@ -533,9 +586,15 @@ reports come when it ends.
    (Deck build 2). Deck run 2 (above): fights 55-57 fps, the APU at 91-99 C, sliding to ~55.
    Fix 3 (the job worker and the GPU waits sleep instead of spinning: about one and a half cores
    of heat and power) and the register table are on the Deck (Deck build 3). Deck run 3 (above):
-   fights hold 60 fps with no slide, the main thread at ~40% and the APU mostly under 90 C. Next:
-   its perf reports, the three slow windows, CodeRabbit's review of build 3, then PR #2's merge
-   (the user's call); the white PRESS START bar is a renderer bug on every platform.
+   fights hold 60 fps with no slide, the main thread at ~40% and the APU mostly under 90 C. Deck
+   run 4 (above): 60 fps throughout, but Steam's UI froze for 50 s after the quit (as after run
+   2's), and gamescope's crash on Switch to Desktop isn't the game's. Next: the exit watcher and
+   a few quits, run 3's perf reports, the three slow windows, CodeRabbit's review of build 3, then
+   PR #2's merge (the user's call); the white PRESS START bar is a renderer bug on every platform.
+   Deck run 5 (above): Survival at 60 fps except two or three seconds at 27-37 fps after a KO,
+   while a second thread presents (most likely the next opponent loading); the quit was clean.
+   `.recomp.json` now says it plays on Windows, Linux and the Deck (live on recomp.fyi once on
+   master).
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
