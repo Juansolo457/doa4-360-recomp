@@ -242,7 +242,7 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
   16x AF, the low-memory reservation on, log flush every second), `README-SteamDeck-Linux.txt`.
   The Deck folder is `~/recomps/DOA4-360-SteamDeck` (AGENTS.md).
 - **SDK:** the Windows tree 12884d9 (GRAW's set plus vexptefp-underflow, the same as GRAW's), then
-  nine Linux patches in their own commit, tree **2f06e47**: GRAW's four (`launch-title-path`,
+  nine Linux patches in their own commit, tree **282a60a**: GRAW's four (`launch-title-path`,
   `linux-crash-renderdoc`, `linux-shm-unlink`, `linux-crash-watchdog`; GRAW's Linux tree f481d5e)
   and DOAX2's three for this engine: `bind-low-port` (system link's VDP socket binds port 1000,
   which Linux refuses to a normal user), `linux-socket-ioctl` (Winsock FIONBIO/FIONREAD and errno
@@ -279,6 +279,11 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
     title and bind the same ports; a server's port 80 or 53, never bound here, keeps its number.
     `setup-linux.sh` now moves only a checkout at a tree an earlier version of it made
     (`old_linux_trees`), so an amended Linux-patch commit is left for `--force`.
+  - **282a60a** (Deck build 3, below) rewrites `register-info-log`. Deck run 2 showed its
+    log-level check, a call into `librexruntime` on every register write (`rex::GetLoggerRaw`),
+    still at about 6% of the command thread. A table of the registers `register_table.inc`
+    names, made at compile time (a bit each, 2.5 KB), now tells an unknown register with one
+    load, and only those reach the debug message's own level check.
 - **Host code:** already guarded for non-Windows (`crash_report.cpp`, `cpu_check.cpp`,
   `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. It built on
   Linux unchanged, with no compiler warnings. One gap from run 1: `ui_style.cpp` looked for the
@@ -390,9 +395,10 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
      Deck build 2; its effect is still to be measured.
   2. SDK: look up the register info only when debug logging is on. **Done**
      (`register-info-log`), on the Deck since Deck build 2. Its log-level check is now ~6% of
-     the command thread (Deck run 2): next, a known-register table built once.
+     the command thread (Deck run 2), so it became a known-register table made at compile time
+     (tree 282a60a, Deck build 3).
   3. Codegen: midasm hooks that pause or yield in the job worker's empty-ring path and in the
-     main thread's wait loop.
+     main thread's wait loop. **Done** (`src/idle_waits.cpp`, Deck build 3).
   Each one gets a Deck profile run before the next.
 - **The 120 fps the Steam overlay shows** is the host presenter (mailbox present mode on a
   120 Hz external display, HDMI audio in this session), repeating the game's last frame. It
@@ -441,6 +447,45 @@ the Deck "crashed".
   it happens again: leave the Deck as it is and say so, and `ps` / `top` over SSH shows what is
   running before a reboot.
 
+### Deck build 3 (2026-10-30, commit 05440f1, tree 282a60a)
+The user's OK ("Write and build"): fix 3 and the register table.
+- **The job worker sleeps** (`src/idle_waits.cpp`). `sub_823FC5A0` loops over a ring of 16 jobs
+  at 0x830ADB08 (the index of the slot it takes next, then 12-byte slots: a state byte, the
+  function, its argument) under the critical section at 0x830ADBCC. When its slot holds no posted
+  job (state 1) it takes and drops the lock and looks again. The ring's other users:
+  `sub_823FC650` posts a job into the first free slot from the worker's index (state 1),
+  `sub_823FC700` collects a finished one (state 3, then 0), `sub_823FC778` and `sub_823FC808`
+  cancel. The posters are two loader state machines (`sub_823FE150`, `sub_82401390`) that step
+  once a frame and only look for state 3 then, so nothing in a frame waits on a job.
+  `Doa4JobWorkerIdle`, at the loop's back edge (the `b` at 0x823FC648), sleeps when its slot holds
+  no posted job, until `Doa4JobPosted` (0x823FC6F4, in `sub_823FC650` after it drops the lock)
+  moves a generation counter on and wakes it, or 2 ms. `--doa4_job_worker_sleep=false` spins as
+  before.
+- **The GPU waits sleep after a short spin.** Run 2's main-thread samples were in the fence wait
+  `sub_8275A0B8` and what it calls (`sub_82761AB8`, `sub_829FD950`, the register save and
+  restore: about 14% of the process's samples, half a core); the ring-space wait `sub_827598B0`
+  (run 1) didn't show. `sub_8275A0B8` has no delay at all between polls; `sub_827598B0` counts
+  100 `db16cyc` (a no-op once translated). Both now call `Doa4GpuWaitBegin` where the wait starts
+  (0x8275A14C, 0x82759900) and `Doa4GpuWaitPoll` before each poll through `sub_82761AB8`
+  (0x8275A154, 0x82759918): the wait's first 20 us spin (`doa4_gpu_wait_spin_us`), then each poll
+  sleeps 100 us (`doa4_gpu_wait_sleep_us`, 0 = spin as before; on Linux the sleeping thread's
+  timer slack is 10 us instead of 50). GRAW sleeps 200 us flat in its ring wait. The command
+  processor is the slower thread here, so a late wake costs time only when it has run out of
+  queued work behind the fence.
+- **A "DOA4 waits" line** after each "DOA4 frames" line (every 10 s): the GPU waits (how many, per
+  frame, the time in all, per frame and as a share of the 10 s), how many sleeps, jobs posted and
+  the job worker's sleeps. With the sleeps off it measures the spinning as it was.
+- **`register-info-log` rewritten** (tree 282a60a, above).
+- The hooks are in the shared manifest, so the next Windows build gets them too; no Windows run
+  of them yet (it needs the user's OK).
+- **Built** (2026-10-30): in WSL2 `setup-linux.sh` moved the SDK checkout from 2f06e47 to
+  282a60a by itself (40 s), and the game took 19 s (codegen with the six hooks, then only the
+  changed files); the Deck container's two builds took 48 s. No warnings from the new code (the
+  SDK's are upstream's unused parameters and sign compares). In the generated code each hook
+  sits just before its instruction, none at a label. The newest glibc is still 2.35 and the
+  newest libstdc++ GLIBCXX_3.4.32. The package (`doa4` SHA-256 d2199d7c...) is in WSL's
+  `private/steamdeck/`, not yet on the Deck.
+
 ## Next steps
 1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
    in WSL2 (boots to the title), and the Deck build, copied to `~/recomps/DOA4-360-SteamDeck`
@@ -451,9 +496,11 @@ the Deck "crashed".
    font path and the launcher's `user/` check.
    Deck run 1 is done (above): fights at 42-50 fps, so the next Linux work is that profile, and
    the white PRESS START bar on every platform. The profile's first two fixes are on the Deck
-   (Deck build 2). Deck run 2 (above): fights 55-57 fps, the APU at 91-99 C, sliding to ~55. Next:
-   fix 3 (the job worker and the main thread's wait loop sleep instead of spinning: two cores of
-   heat and power), the register table, then a run with the user's manual GPU clock off.
+   (Deck build 2). Deck run 2 (above): fights 55-57 fps, the APU at 91-99 C, sliding to ~55.
+   Fix 3 (the job worker and the GPU waits sleep instead of spinning: about one and a half cores
+   of heat and power) and the register table are built (Deck build 3), not yet on the Deck.
+   Next: copy it with the user's OK, a run under the profiler (its "DOA4 waits" lines say how
+   long the GPU waits are), then one with the user's manual GPU clock off.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
