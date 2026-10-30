@@ -389,7 +389,8 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
      with the 1 ms slice as a fallback. **Done** (`linux-wait-multiple`), on the Deck since
      Deck build 2; its effect is still to be measured.
   2. SDK: look up the register info only when debug logging is on. **Done**
-     (`register-info-log`), on the Deck since Deck build 2.
+     (`register-info-log`), on the Deck since Deck build 2. Its log-level check is now ~6% of
+     the command thread (Deck run 2): next, a known-register table built once.
   3. Codegen: midasm hooks that pause or yield in the job worker's empty-ring path and in the
      main thread's wait loop.
   Each one gets a Deck profile run before the next.
@@ -401,6 +402,45 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
   with nothing behind them (a 360 recording of the title screen). Probably a quad whose alpha
   is lost; needs a RenderDoc capture of the title on Windows.
 
+### Deck run 2 (2026-10-29, the user; Deck build 2, tree 5e1f93a; logs `doa4_006`-`007.log`)
+Two sessions of fights on the external display (Release, 720p; session 7's swapchain went to
+1080p), the first under `doa4-prof.sh` (`~/recomps/doa4-prof/1029-215839`). The user's report:
+good for a while, then slower the longer they played, and after quitting the second session
+the Deck "crashed".
+- **Faster.** Fights average 55.7 and 57.1 fps (10 s windows), against 48.9 in run 1's slow
+  windows. Each session starts at 58-59 and slides to about 55 within a few minutes (lowest
+  window 47.9).
+- **The audio worker no longer spins** (gone from the busy threads; ~96% in run 1). Still at a
+  whole core each: the job worker (`XThread86FFE6C0`, `sub_823FC5A0`, ~109%), the main thread
+  (~96-108%, waiting on the command processor) and the GPU command thread (95-98% in fights,
+  the limit). The process still uses about 3.5 cores.
+- **`register-info-log` saved less than expected.** `GetRegisterInfo` is gone, but
+  `rex::GetLoggerRaw`, a call into another library on every register write, is now about 6% of
+  the command thread (1.6-1.7% of the process against `GetRegisterInfo`'s 2.0-2.2%). A table of
+  known registers built once, or the logger looked up once, would remove it.
+- **The slide is heat or power, not something growing.** The seven perf samples (one every
+  40 s) have the same shape from first to last; no function grows. The APU ran at 91-99 C
+  through both sessions (fancontrol warns above 90; the ACPI zone's trips are 100 and 105 C).
+  GPU time per frame rose from about 7.6 to 11.4 ms at a fixed 1600 MHz shader clock. Run 1 was
+  as hot (237 warnings in its 25 minutes).
+- **The user's Deck forces the GPU to 1600 MHz** (Steam's manual GPU clock;
+  `power_dpm_force_performance_level` is `manual`, set again at every Steam start). The Deck's
+  CPU and GPU share 15 W, so with the CPU the limit, a pinned GPU clock takes power the CPU
+  could use. Worth a run with it off (a per-game profile for DOA4).
+- **The quit and the "crash".** Both sessions were quit the same way (Steam button, Exit Game).
+  The game exited cleanly both times (`Title terminated; hard-exiting process`, exit status 0;
+  Steam saw every process end at 22:30:16). After the second, the Steam UI was created again and
+  the user pressed the Steam button twice more (22:30:18-19), then nothing: no kernel errors, no
+  GPU timeout, no logind power-key event. fancontrol kept logging 90-93 C every second until the
+  journal stops at 22:32:06 with no shutdown sequence, which fits a forced power-off by the user.
+  The next boot started at 22:32:35. So the system was alive but the screen or UI was stuck, and
+  something kept the APU hot for two minutes after the game had gone. After the first session the
+  temperature had dropped below 90 within a minute. Steam's background update job was in a loop
+  ("apps still needs updates, run again", ~400 a minute), but it loops all day, game or not.
+  HDMI-CEC "wake TV" calls at the quit got no immediate answer from the TV. Cause not found. If
+  it happens again: leave the Deck as it is and say so, and `ps` / `top` over SSH shows what is
+  running before a reboot.
+
 ## Next steps
 1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
    in WSL2 (boots to the title), and the Deck build, copied to `~/recomps/DOA4-360-SteamDeck`
@@ -411,9 +451,9 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
    font path and the launcher's `user/` check.
    Deck run 1 is done (above): fights at 42-50 fps, so the next Linux work is that profile, and
    the white PRESS START bar on every platform. The profile's first two fixes are on the Deck
-   (Deck build 2), with `doa4-prof.sh` waiting for the game: next, the user's fights under it,
-   then the frame lines and profile against run 1's, then fix 3 if the command thread still
-   limits the frame rate.
+   (Deck build 2). Deck run 2 (above): fights 55-57 fps, the APU at 91-99 C, sliding to ~55. Next:
+   fix 3 (the job worker and the main thread's wait loop sleep instead of spinning: two cores of
+   heat and power), the register table, then a run with the user's manual GPU clock off.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
