@@ -36,11 +36,12 @@ expected_tree=12884d9f3cbcc28abdd88159c8ed93651bc9192d  # after the last patch (
 # filled it); the crash report's backtrace runs under a 5 s alarm.
 # doax2-360-recomp's three, for this engine (DOA4 imports the same system-link socket calls and
 # uses XAPI fibers): guest ports below 1024 used 10000 higher (Linux refuses low ports to a normal
-# user; the system-link VDP socket binds port 1000), for binds and for peers on the local network
-# only (here, not yet in DOAX2: a server elsewhere keeps its port); ioctlsocket's Winsock commands
-# (FIONBIO, FIONREAD) translated to Linux's, any other passed on as it is (here, not yet in DOAX2),
-# and a failed socket call's errno reported to the guest as its Winsock code (WSAEWOULDBLOCK, ...):
-# DOAX2 never drew a first frame without both;
+# user; the system-link VDP socket binds port 1000), for binds and, in destinations and sources,
+# only on the low ports the title bound itself (here, not yet in DOAX2: its peers bind the same
+# ones wherever they are, and a server's port 80 or 53 keeps its number); ioctlsocket's Winsock
+# commands (FIONBIO, FIONREAD) translated to Linux's, any other passed on as it is (here, not yet
+# in DOAX2), and a failed socket call's errno reported to the guest as its Winsock code
+# (WSAEWOULDBLOCK, ...): DOAX2 never drew a first frame without both;
 # and a thread fiber destroyed from another thread no longer clears that thread's current fiber
 # (a guest thread's exit crashed the main thread's next SwitchToFiber).
 # This project's two, from the Steam Deck's profile of a fight: a wait on several handles sleeps
@@ -52,7 +53,13 @@ linux_patches=(rexglue-bd833a2-launch-title-path rexglue-bd833a2-linux-crash-ren
                rexglue-bd833a2-bind-low-port rexglue-bd833a2-linux-socket-ioctl
                rexglue-bd833a2-linux-fiber-destroy rexglue-bd833a2-linux-wait-multiple
                rexglue-bd833a2-register-info-log)
-linux_tree=5e1f93a77ba59316d1a3fc1bbb0397dbce8192c3
+linux_tree=2f06e47aef4c9f4944a39d248e82a3ea1e8c216a
+# The Linux trees earlier versions of this script made (c66e664 with DOAX2's socket patches as
+# DOAX2 has them, ff9a4d1 before the profile's two patches, 5e1f93a with bind-low-port by address
+# range): a checkout at one of them moves to linux_tree by itself. Any other tree is a change of
+# someone's own and is left for --force.
+old_linux_trees=(c66e6647e87ffc80a0066b97bfcbcb47ec039123 ff9a4d102e20ddb5ad2dd2c6e21337dd3bfd2a0a
+                 5e1f93a77ba59316d1a3fc1bbb0397dbce8192c3)
 force=0
 jobs=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))
 while [[ $# -gt 0 ]]; do
@@ -83,9 +90,10 @@ if [[ -d "$sdk" ]]; then
   # stopped partway or was changed by hand, and replacing it is --force's job.
   head=$(git -C "$sdk" rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null || true)
   changes=$(git -C "$sdk" status --porcelain --ignore-submodules=all 2>/dev/null || true)
-  # An older set of the Linux patches, in their own commit on the patched tree: that commit goes,
-  # and they're applied again below. The build folder stays, so the SDK rebuilds only what changed.
-  if [[ "$head" != "$expected_tree" && "$head" != "$linux_tree" && -z "$changes" &&
+  # An older set of the Linux patches (one of old_linux_trees), in their own commit on the patched
+  # tree: that commit goes, and they're applied again below. The build folder stays, so the SDK
+  # rebuilds only what changed.
+  if [[ " ${old_linux_trees[*]} " == *" $head "* && -z "$changes" &&
         "$(git -C "$sdk" log -1 --format=%s 2>/dev/null)" == 'doa4-360-recomp Linux patches' &&
         "$(git -C "$sdk" rev-parse --verify --quiet 'HEAD~1^{tree}' 2>/dev/null)" == "$expected_tree" ]]; then
     echo 'SDK source: replacing an older set of the Linux patches'

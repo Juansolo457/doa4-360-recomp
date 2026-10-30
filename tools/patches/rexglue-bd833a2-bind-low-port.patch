@@ -1,8 +1,16 @@
 diff --git a/src/system/xsocket.cpp b/src/system/xsocket.cpp
-index 0b96626..c6d5888 100644
+index 0b96626..30d65ef 100644
 --- a/src/system/xsocket.cpp
 +++ b/src/system/xsocket.cpp
-@@ -17,6 +17,7 @@
+@@ -9,6 +9,7 @@
+  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
+  */
+ 
++#include <atomic>
+ #include <cstring>
+ 
+ #include <rex/kernel/xam/module.h>
+@@ -17,6 +18,7 @@
  #include <rex/system/xsocket.h>
  // #include <rex/system/xnet.h>
  
@@ -10,7 +18,7 @@ index 0b96626..c6d5888 100644
  #include <rex/net/socket.h>
  
  // Standard socket types used by Xbox API emulation
-@@ -105,8 +106,47 @@ X_STATUS XSocket::IOControl(uint32_t cmd, uint8_t* arg_ptr) {
+@@ -105,8 +107,47 @@ X_STATUS XSocket::IOControl(uint32_t cmd, uint8_t* arg_ptr) {
    return X_STATUS_SUCCESS;
  }
  
@@ -20,25 +28,28 @@ index 0b96626..c6d5888 100644
 +// non-blocking and then wait in recvfrom for ever (doax2-360-recomp on the Steam Deck: system
 +// link's VDP socket on port 1000, no first frame). Mapping binds, destinations and sources the
 +// same way everywhere keeps two hosts able to reach each other; the guest only sees its ports.
-+// Only peers on the local network are mapped: system link finds them by broadcast, so it never
-+// leaves it. A destination elsewhere (a server's port 80 or 53) keeps the guest's port, and a
-+// packet from elsewhere shows the port it came from.
++// Destinations and sources are mapped only on the low ports this title has bound itself: its
++// peers run the same title and bind the same ports, wherever they are (a LAN, or a VPN such as
++// Tailscale's 100.64/10), while a server's port 80 or 53, never bound here, keeps its number.
 +constexpr uint16_t kLowPortOffset = 10000;
-+uint16_t HostPort(uint16_t guest_port) {
++std::atomic<uint32_t> bound_low_ports[1024 / 32];  // a bit for each guest port Bind mapped
++bool BoundLowPort(uint16_t guest_port) {
++  return guest_port != 0 && guest_port < 1024 &&
++         ((bound_low_ports[guest_port / 32].load(std::memory_order_relaxed) >> (guest_port % 32)) &
++          1u);
++}
++uint16_t HostPort(uint16_t guest_port) {  // a bind
 +  return (guest_port != 0 && guest_port < 1024) ? uint16_t(guest_port + kLowPortOffset)
 +                                                : guest_port;
 +}
-+uint16_t GuestPort(uint16_t host_port) {
-+  return (host_port > kLowPortOffset && host_port < kLowPortOffset + 1024)
++uint16_t PeerHostPort(uint16_t guest_port) {  // a destination
++  return BoundLowPort(guest_port) ? uint16_t(guest_port + kLowPortOffset) : guest_port;
++}
++uint16_t PeerGuestPort(uint16_t host_port) {  // a source
++  return (host_port > kLowPortOffset && host_port < kLowPortOffset + 1024 &&
++          BoundLowPort(uint16_t(host_port - kLowPortOffset)))
 +             ? uint16_t(host_port - kLowPortOffset)
 +             : host_port;
-+}
-+bool LocalNetwork(uint32_t address) {  // host order
-+  return address == 0xFFFFFFFFu ||     // broadcast
-+         (address >> 24) == 127 ||     // loopback
-+         (address >> 24) == 10 ||      // the private networks: 10/8, 172.16/12, 192.168/16
-+         (address >> 20) == 0xAC1 || (address >> 16) == 0xC0A8 ||
-+         (address >> 16) == 0xA9FE;    // link-local, 169.254/16
 +}
 +}  // namespace
 +
@@ -46,20 +57,17 @@ index 0b96626..c6d5888 100644
 -  int ret = connect(native_handle_, (sockaddr*)name, name_len);
 +  N_XSOCKADDR mapped = *name;
 +  if (mapped.address_family == AF_INET) {
-+    // sa_data starts with the port, then the address, in network order (as the guest wrote them).
++    // sa_data starts with the port, in network order (as the guest wrote it).
 +    const auto* data = reinterpret_cast<const uint8_t*>(mapped.sa_data);
-+    const uint32_t address = uint32_t(data[2]) << 24 | data[3] << 16 | data[4] << 8 | data[5];
-+    if (LocalNetwork(address)) {
-+      const uint16_t host_port = HostPort(uint16_t(data[0] << 8 | data[1]));
-+      mapped.sa_data[0] = char(host_port >> 8);
-+      mapped.sa_data[1] = char(host_port & 0xFF);
-+    }
++    const uint16_t host_port = PeerHostPort(uint16_t(data[0] << 8 | data[1]));
++    mapped.sa_data[0] = char(host_port >> 8);
++    mapped.sa_data[1] = char(host_port & 0xFF);
 +  }
 +  int ret = connect(native_handle_, (sockaddr*)&mapped, name_len);
    if (ret < 0) {
      return X_STATUS_UNSUCCESSFUL;
    }
-@@ -115,7 +155,14 @@ X_STATUS XSocket::Connect(N_XSOCKADDR* name, int name_len) {
+@@ -115,7 +156,15 @@ X_STATUS XSocket::Connect(N_XSOCKADDR* name, int name_len) {
  }
  
  X_STATUS XSocket::Bind(N_XSOCKADDR_IN* name, int name_len) {
@@ -70,24 +78,24 @@ index 0b96626..c6d5888 100644
 +  mapped.sin_port = HostPort(port);
 +  int ret = bind(native_handle_, (sockaddr*)&mapped, name_len);
 +  if (ret >= 0 && uint16_t(mapped.sin_port) != port) {
++    bound_low_ports[port / 32].fetch_or(1u << (port % 32), std::memory_order_relaxed);
 +    REXSYS_INFO("XSocket::Bind: guest port {} is host port {}", port, uint16_t(mapped.sin_port));
 +  }
    if (ret < 0) {
      return X_STATUS_UNSUCCESSFUL;
    }
-@@ -198,7 +245,10 @@ int XSocket::RecvFrom(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADD
+@@ -198,7 +247,9 @@ int XSocket::RecvFrom(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADD
    if (from) {
      from->sin_family = nfrom.sin_family;
      from->sin_addr = ntohl(nfrom.sin_addr.s_addr);  // BE <- BE
 -    from->sin_port = nfrom.sin_port;
 +    // Both fields hold numbers, stored big-endian: convert from network order, and give the
 +    // guest the port it sent to.
-+    const uint16_t port = ntohs(nfrom.sin_port);
-+    from->sin_port = LocalNetwork(ntohl(nfrom.sin_addr.s_addr)) ? GuestPort(port) : port;
++    from->sin_port = PeerGuestPort(ntohs(nfrom.sin_port));
      std::memset(from->x_sin_zero, 0, sizeof(from->x_sin_zero));
    }
  
-@@ -228,9 +278,12 @@ int XSocket::SendTo(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADDR_
+@@ -228,9 +279,11 @@ int XSocket::SendTo(uint8_t* buf, uint32_t buf_len, uint32_t flags, N_XSOCKADDR_
  
    sockaddr_in nto;
    if (to) {
@@ -97,8 +105,7 @@ index 0b96626..c6d5888 100644
 +    nto.sin_addr.s_addr = htonl(to->sin_addr);
      nto.sin_family = to->sin_family;
 -    nto.sin_port = to->sin_port;
-+    const uint16_t port = to->sin_port;
-+    nto.sin_port = htons(LocalNetwork(to->sin_addr) ? HostPort(port) : port);
++    nto.sin_port = htons(PeerHostPort(to->sin_port));
    }
  
    return sendto(native_handle_, reinterpret_cast<char*>(buf), buf_len, flags,
