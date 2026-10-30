@@ -43,11 +43,16 @@ expected_tree=12884d9f3cbcc28abdd88159c8ed93651bc9192d  # after the last patch (
 # DOAX2 never drew a first frame without both;
 # and a thread fiber destroyed from another thread no longer clears that thread's current fiber
 # (a guest thread's exit crashed the main thread's next SwitchToFiber).
+# This project's two, from the Steam Deck's profile of a fight: a wait on several handles sleeps
+# until one may be signaled (it slept 0 ms in its last millisecond, so an alertable one, run in
+# 1 ms slices, spun a core: the audio worker's), and the GPU command thread looks up a register's
+# info only when the debug message it's for would be written (a tenth of that thread's time).
 linux_patches=(rexglue-bd833a2-launch-title-path rexglue-bd833a2-linux-crash-renderdoc
                rexglue-bd833a2-linux-shm-unlink rexglue-bd833a2-linux-crash-watchdog
                rexglue-bd833a2-bind-low-port rexglue-bd833a2-linux-socket-ioctl
-               rexglue-bd833a2-linux-fiber-destroy)
-linux_tree=ff9a4d102e20ddb5ad2dd2c6e21337dd3bfd2a0a
+               rexglue-bd833a2-linux-fiber-destroy rexglue-bd833a2-linux-wait-multiple
+               rexglue-bd833a2-register-info-log)
+linux_tree=5e1f93a77ba59316d1a3fc1bbb0397dbce8192c3
 force=0
 jobs=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))
 while [[ $# -gt 0 ]]; do

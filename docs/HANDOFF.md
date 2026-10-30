@@ -242,13 +242,15 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
   16x AF, the low-memory reservation on, log flush every second), `README-SteamDeck-Linux.txt`.
   The Deck folder is `~/recomps/DOA4-360-SteamDeck` (AGENTS.md).
 - **SDK:** the Windows tree 12884d9 (GRAW's set plus vexptefp-underflow, the same as GRAW's), then
-  seven Linux patches in their own commit, tree **ff9a4d1**: GRAW's four (`launch-title-path`,
+  nine Linux patches in their own commit, tree **5e1f93a**: GRAW's four (`launch-title-path`,
   `linux-crash-renderdoc`, `linux-shm-unlink`, `linux-crash-watchdog`; GRAW's Linux tree f481d5e)
   and DOAX2's three for this engine: `bind-low-port` (system link's VDP socket binds port 1000,
   which Linux refuses to a normal user), `linux-socket-ioctl` (Winsock FIONBIO/FIONREAD and errno
   to WSA codes: DOAX2 drew no first frame without both) and `linux-fiber-destroy`. DOA4 imports
   the same socket calls (`NetDll_bind`, `ioctlsocket`, `recvfrom`, `sendto`, `WSAGetLastError`)
-  and uses XAPI fibers, so these are expected to be needed; not yet proven for DOA4.
+  and uses XAPI fibers, so these are expected to be needed; not yet proven for DOA4. Then this
+  project's two from the Deck profile (Deck run 1, below): `linux-wait-multiple` and
+  `register-info-log`.
   - Tree history: **c66e664** is what's built so far (WSL2 and the Deck, 2026-10-29, both tree
     checks passing), with DOAX2's two socket patches as DOAX2 has them. PR #2's review narrowed
     both (ff9a4d1, **not yet built**): the low ports are mapped only for peers on the local
@@ -257,6 +259,17 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
     unchanged again, as upstream did, instead of failing it. DOAX2 still has the earlier
     versions. `setup-linux.sh` now swaps an older Linux-patch commit for the new one by itself
     (no `--force`), so the rebuild keeps the build folder and recompiles only what changed.
+  - **5e1f93a** (not yet built) adds the profile's first two fixes on top of ff9a4d1, both
+    Linux-only so the Windows tree stays 12884d9:
+    - `linux-wait-multiple`: `WaitMultiple` sleeps on a shared condition variable until a
+      handle may have been signaled, the timeout or 1 ms, instead of `sleep_for` a truncated
+      millisecond count (0 inside every 1 ms alertable slice). Every place a handle's
+      `cond_.notify_all()` signaled it (event, semaphore release, mutant release, timer, thread
+      exit) now calls `NotifyAll()`, which also moves a generation counter on and wakes the
+      sleepers. The alertable slice is rounded up instead of down, so its last millisecond
+      doesn't spin either.
+    - `register-info-log`: `CommandProcessor::WriteRegister` looks up `GetRegisterInfo` only
+      when the GPU log would write the debug message it's for.
 - **Host code:** already guarded for non-Windows (`crash_report.cpp`, `cpu_check.cpp`,
   `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. It built on
   Linux unchanged, with no compiler warnings. One gap from run 1: `ui_style.cpp` looked for the
@@ -354,8 +367,10 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
 - **Planned fixes, smallest first** (each needs the user's OK to build):
   1. Linux SDK: make `WaitMultiple` really wait. Either sleep the true remaining time, or
      better, wake on a signal through a shared generation counter and condition variable,
-     with the 1 ms slice as a fallback.
-  2. SDK: look up the register info only when debug logging is on.
+     with the 1 ms slice as a fallback. **Written** (`linux-wait-multiple`, tree 5e1f93a), not
+     yet built.
+  2. SDK: look up the register info only when debug logging is on. **Written**
+     (`register-info-log`), not yet built.
   3. Codegen: midasm hooks that pause or yield in the job worker's empty-ring path and in the
      main thread's wait loop.
   Each one gets a Deck profile run before the next.
@@ -377,7 +392,9 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
    patches (tree ff9a4d1) and the font path need a WSL2 and a Deck rebuild, and the launcher's
    `user/` check goes over by itself (not while the game runs: bash reads a script as it goes).
    Deck run 1 is done (above): fights at 42-50 fps, so the next Linux work is that profile, and
-   the white PRESS START bar on every platform.
+   the white PRESS START bar on every platform. The profile's first two fixes are written (tree
+   5e1f93a): next, with the user's OK (the PC may be busy), the WSL2 and Deck rebuilds with them,
+   then a Deck fight under `doa4-prof.sh` to see what the GPU command thread gets back.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.

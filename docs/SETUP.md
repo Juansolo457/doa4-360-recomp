@@ -91,7 +91,7 @@ scripts come from graw360-recomp and doax2-360-recomp. **Not yet built or run fo
    SDK's FFmpeg build) and put your disc's files in `port/assets` (a link to a Windows checkout's
    `port/assets` works).
 3. `tools/setup-linux.sh`: the patched SDK from source, the same patched tree as Windows plus
-   seven Linux-only runtime patches, built and installed for RelWithDebInfo and Release. The
+   nine Linux-only patches, built and installed for RelWithDebInfo and Release. The
    first run takes a while.
 4. `tools/build-linux.sh` (RelWithDebInfo; `--config Release` for the fast one).
 
