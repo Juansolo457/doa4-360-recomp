@@ -325,6 +325,43 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
   `~/recomps/doa4-prof/<time>/`. A fight under it says whether the frame waits on the GPU, the
   GPU command thread or the game's own thread. Cheap test either way: `anisotropic_override` -1
   (the game's own filtering) instead of 16x.
+- **Profile (session 5, three fights, `~/recomps/doa4-prof/1029-175258`):** the Deck is CPU and
+  power bound, not GPU bound.
+  - GPU busy 28-56% throughout, but four threads each use a whole core, so the CPU runs at
+    2.5-3.1 GHz (3.5 GHz max).
+  - In the 13 windows under 54 fps the GPU command thread is about 90% busy, against about 74%
+    in the 23 windows at 57-60. It is the limit. The other three busy threads don't change
+    between slow and fast windows, because they're waiting:
+    - `Audio Worker` (~96%), an SDK bug. The audio worker's alertable 500 ms `WaitAny` runs as
+      1 ms slices of `PosixConditionBase::WaitMultiple`. When no handle is signaled, that
+      sleeps `duration_cast<milliseconds>(end_time - now)`, which is always 0 inside a 1 ms
+      slice, so `sleep_for(0)` returns at once. Every alertable multi-object wait on Linux
+      spins at 100%, user time only (measured 97% user, 0% system). The same code is in
+      upstream `main`.
+    - `XThread4DFFD6C0` (~99%), the game's job worker `sub_823FC5A0`. It loops forever doing
+      `RtlEnterCriticalSection`, a check of a 16-slot job ring, then `RtlLeaveCriticalSection`,
+      with no wait when the ring is empty. Its samples are almost all that lock traffic, on
+      the lock the main thread posts jobs under.
+    - `Main XThread` (~90%) mostly spins in `sub_827598B0` / `sub_8275A0B8`. They loop on
+      `sub_82761AB8`, which compares two command-processor pointers against a 2 s timeout,
+      with a 100-step delay loop in between: the main thread waits for the GPU command thread
+      to catch up.
+  - The GPU command thread itself: about 65% `librexgpu-xenos`, 17% RADV, 13% libc copies.
+    About a third of it is register writes (`WriteRegister`, `GetRegisterInfo`, the Vulkan
+    `WriteRegister`, `ExecutePacketType0`). `CommandProcessor::WriteRegister` calls
+    `RegisterFile::GetRegisterInfo` (a switch over the whole register table) on every write,
+    only to log an unknown register at debug level: about 10% of the thread.
+- **Planned fixes, smallest first** (each needs the user's OK to build):
+  1. Linux SDK: make `WaitMultiple` really wait. Either sleep the true remaining time, or
+     better, wake on a signal through a shared generation counter and condition variable,
+     with the 1 ms slice as a fallback.
+  2. SDK: look up the register info only when debug logging is on.
+  3. Codegen: midasm hooks that pause or yield in the job worker's empty-ring path and in the
+     main thread's wait loop.
+  Each one gets a Deck profile run before the next.
+- **The 120 fps the Steam overlay shows** is the host presenter (mailbox present mode on a
+  120 Hz external display, HDMI audio in this session), repeating the game's last frame. It
+  isn't the game's rate.
 - **PRESS START sits on an opaque white bar** on the title screen (the user's report). Windows
   draws it too (the 1440p captures), so it isn't the Deck. On the 360 the chrome letters blink
   with nothing behind them (a 360 recording of the title screen). Probably a quad whose alpha
