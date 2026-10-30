@@ -242,7 +242,7 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
   16x AF, the low-memory reservation on, log flush every second), `README-SteamDeck-Linux.txt`.
   The Deck folder is `~/recomps/DOA4-360-SteamDeck` (AGENTS.md).
 - **SDK:** the Windows tree 12884d9 (GRAW's set plus vexptefp-underflow, the same as GRAW's), then
-  nine Linux patches in their own commit, tree **5e1f93a**: GRAW's four (`launch-title-path`,
+  nine Linux patches in their own commit, tree **2f06e47**: GRAW's four (`launch-title-path`,
   `linux-crash-renderdoc`, `linux-shm-unlink`, `linux-crash-watchdog`; GRAW's Linux tree f481d5e)
   and DOAX2's three for this engine: `bind-low-port` (system link's VDP socket binds port 1000,
   which Linux refuses to a normal user), `linux-socket-ioctl` (Winsock FIONBIO/FIONREAD and errno
@@ -251,16 +251,17 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
   and uses XAPI fibers, so these are expected to be needed; not yet proven for DOA4. Then this
   project's two from the Deck profile (Deck run 1, below): `linux-wait-multiple` and
   `register-info-log`.
-  - Tree history: **c66e664** is what's built so far (WSL2 and the Deck, 2026-10-29, both tree
+  - Tree history: **c66e664** was built first (WSL2 and the Deck, 2026-10-29, both tree
     checks passing), with DOAX2's two socket patches as DOAX2 has them. PR #2's review narrowed
-    both (ff9a4d1, **not yet built**): the low ports are mapped only for peers on the local
+    both (ff9a4d1, never built by itself): the low ports are mapped only for peers on the local
     network (broadcast, loopback, the private ranges, link-local), so a server elsewhere keeps
     port 80 or 53; and `socket_ioctl` passes any command it doesn't translate to `ioctl`
     unchanged again, as upstream did, instead of failing it. DOAX2 still has the earlier
     versions. `setup-linux.sh` now swaps an older Linux-patch commit for the new one by itself
     (no `--force`), so the rebuild keeps the build folder and recompiles only what changed.
-  - **5e1f93a** (not yet built) adds the profile's first two fixes on top of ff9a4d1, both
-    Linux-only so the Windows tree stays 12884d9:
+  - **5e1f93a** (built in WSL2 and the Deck container on 2026-10-29: Deck build 2, below) adds
+    the profile's first two fixes on top of ff9a4d1, both Linux-only so the Windows tree stays
+    12884d9:
     - `linux-wait-multiple`: `WaitMultiple` sleeps on a shared condition variable until a
       handle may have been signaled, the timeout or 1 ms, instead of `sleep_for` a truncated
       millisecond count (0 inside every 1 ms alertable slice). Every place a handle's
@@ -270,6 +271,14 @@ build is on the Deck, not yet run there** (every build needs the user's OK).
       doesn't spin either.
     - `register-info-log`: `CommandProcessor::WriteRegister` looks up `GetRegisterInfo` only
       when the GPU log would write the debug message it's for.
+  - **2f06e47** (built in WSL2 and the Deck container on 2026-10-29; not on the Deck, which has
+    5e1f93a) is the review's second round on `bind-low-port`. Mapping by address range missed
+    peers on any other range, such as a VPN's (Tailscale's 100.64/10): a bind to port 1000 used
+    11000, but a send to 1000 went to 1000. Now a destination or source is mapped only on a low
+    port this title has bound itself, whatever its address. System link's peers run the same
+    title and bind the same ports; a server's port 80 or 53, never bound here, keeps its number.
+    `setup-linux.sh` now moves only a checkout at a tree an earlier version of it made
+    (`old_linux_trees`), so an amended Linux-patch commit is left for `--force`.
 - **Host code:** already guarded for non-Windows (`crash_report.cpp`, `cpu_check.cpp`,
   `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. It built on
   Linux unchanged, with no compiler warnings. One gap from run 1: `ui_style.cpp` looked for the
@@ -316,10 +325,20 @@ GLIBCXX_3.4.32. `make_linux_package.sh` made the 296 MB folder in `private/steam
   `port/assets` into `game/` (59 files, 7.22 GB, 62 s; `default.xex`'s hash checked). The script
   now runs ssh with `BatchMode=yes` and checks the connection first, so a missing key stops it
   at once with a message; SETUP.md says WSL needs its own key. This copy predates the
-  `.game-complete` marker, so a later `--with-game` copies `game/` again unless the marker is
-  written there by hand (the copy was checked complete).
+  `.game-complete` marker, so a later `--with-game` would have copied `game/` again; the marker
+  was written there by hand with Deck build 2 (the copy was checked complete).
 - On the Deck (SteamOS 3.9.5, glibc 2.43, RADV VANGOGH): `ldd` finds every library for both
   programs, and its libstdc++ has GLIBCXX_3.4.32.
+
+### Deck build 2 (2026-10-29, commit 7698c54, tree 5e1f93a)
+The user's OK. The profile's two fixes and the review's earlier changes (tree ff9a4d1, the font
+path). `setup-linux.sh` moved both SDK checkouts from c66e664 by itself and rebuilt only what
+changed: in WSL2 the SDK took 37 s and the game 8 s, and the Deck container's two builds 44 s.
+The four changed SDK files compiled with no new warnings. The newest glibc is still 2.35 and
+the newest libstdc++ GLIBCXX_3.4.32. The package went to the Deck through Windows' ssh
+(`doa4`'s hash matching; `logs/`, `user/` and `game/` untouched, the new launcher included), and
+`doa4-prof.sh` was started again (unit `doa4-prof-215839`, into
+`~/recomps/doa4-prof/1029-215839/`) to profile the next fights.
 
 ### Deck run 1 (2026-10-29, the user; Release, 720p, through Steam; logs `doa4_001`-`004.log`)
 Four sessions, menus and several fights. The user's report: gameplay intact, no graphical or
@@ -367,10 +386,10 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
 - **Planned fixes, smallest first** (each needs the user's OK to build):
   1. Linux SDK: make `WaitMultiple` really wait. Either sleep the true remaining time, or
      better, wake on a signal through a shared generation counter and condition variable,
-     with the 1 ms slice as a fallback. **Written** (`linux-wait-multiple`, tree 5e1f93a), not
-     yet built.
-  2. SDK: look up the register info only when debug logging is on. **Written**
-     (`register-info-log`), not yet built.
+     with the 1 ms slice as a fallback. **Done** (`linux-wait-multiple`), on the Deck since
+     Deck build 2; its effect is still to be measured.
+  2. SDK: look up the register info only when debug logging is on. **Done**
+     (`register-info-log`), on the Deck since Deck build 2.
   3. Codegen: midasm hooks that pause or yield in the job worker's empty-ring path and in the
      main thread's wait loop.
   Each one gets a Deck profile run before the next.
@@ -388,13 +407,13 @@ animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower 
    with the disc's files. Next: the user's Deck run at 720p, through Steam (the folder's README)
    and the controller (PLAN.md M5: 60 fps in a 2-character fight or a measured list of what
    stops it); it also shows the dialog font. Its logs stay in the Deck folder's `logs/`: pull
-   them over SSH from Windows. The Deck has the c66e664 build; the review fixes to the SDK
-   patches (tree ff9a4d1) and the font path need a WSL2 and a Deck rebuild, and the launcher's
-   `user/` check goes over by itself (not while the game runs: bash reads a script as it goes).
+   them over SSH from Windows. Deck build 2 (above) brought the review's SDK patch changes, the
+   font path and the launcher's `user/` check.
    Deck run 1 is done (above): fights at 42-50 fps, so the next Linux work is that profile, and
-   the white PRESS START bar on every platform. The profile's first two fixes are written (tree
-   5e1f93a): next, with the user's OK (the PC may be busy), the WSL2 and Deck rebuilds with them,
-   then a Deck fight under `doa4-prof.sh` to see what the GPU command thread gets back.
+   the white PRESS START bar on every platform. The profile's first two fixes are on the Deck
+   (Deck build 2), with `doa4-prof.sh` waiting for the game: next, the user's fights under it,
+   then the frame lines and profile against run 1's, then fix 3 if the command thread still
+   limits the frame rate.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
