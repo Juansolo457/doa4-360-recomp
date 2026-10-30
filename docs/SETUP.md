@@ -80,5 +80,30 @@ Saves stay in `port/user`, logs in `port/logs`. A crash writes `crash-<time>.txt
 
 ## Linux and the Steam Deck
 
-Not yet: the native Linux build comes after the Windows work is reviewed and merged
-([PLAN.md](PLAN.md), M5). On the Deck it will default to 720p.
+A native build, no Proton or Wine, drawn with the same Vulkan renderer on the host driver. The
+scripts come from graw360-recomp and doax2-360-recomp. **Not yet built or run for DOA4**
+(branch `linux-native`, [HANDOFF.md](HANDOFF.md), "Native Linux").
+
+1. Packages (Ubuntu names): `clang lld cmake ninja-build git python3 autoconf libgtk-3-dev
+   libx11-xcb-dev libxss-dev libwayland-dev wayland-protocols libxkbcommon-dev libdecor-0-dev
+   libasound2-dev libpulse-dev libpipewire-0.3-dev libvulkan-dev`. WSL2 with Ubuntu works.
+2. Clone this repository on a Linux file system (a Windows checkout's CRLF line endings break the
+   SDK's FFmpeg build) and put your disc's files in `port/assets` (a link to a Windows checkout's
+   `port/assets` works).
+3. `tools/setup-linux.sh`: the patched SDK from source, the same patched tree as Windows plus
+   nine Linux-only patches, built and installed for RelWithDebInfo and Release. The
+   first run takes a while.
+4. `tools/build-linux.sh` (RelWithDebInfo; `--config Release` for the fast one).
+
+A build made on a recent distribution needs that distribution's glibc, which SteamOS doesn't
+have. For the Steam Deck, `tools/build-deck.sh` (needs `podman`) does steps 3 and 4 in an Ubuntu
+22.04 container (`tools/linux/deck.Containerfile`, the environment ReXGlue's own Linux releases
+are built in), with its own SDK checkout and build folder, and checks every binary needs glibc
+2.35 at most. Then `tools/steamdeck/make_linux_package.sh --deck deck@steamdeck --with-game`
+copies the Deck folder to `~/recomps/DOA4-360-SteamDeck`, with your disc's files the first time.
+`--deck` needs an SSH key the Deck accepts on the machine the script runs on; in WSL2 that is
+WSL's own `~/.ssh`, not Windows' (`ssh-copy-id deck@steamdeck` once, with the Deck's password).
+Without one the script stops at the start and says so. Otherwise copy
+`private/steamdeck/DOA4-360-SteamDeck` yourself, with your disc's files in its `game/`. The
+folder's `README-SteamDeck-Linux.txt` says how to add it to Steam. On the Deck the game runs
+at **720p by default** (`doa4.toml`, `resolution_scale = 1`).

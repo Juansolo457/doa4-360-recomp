@@ -9,7 +9,11 @@ next model starts here, not from chat history.
 **M1 reached, M2 close (2026-10-29): menus, character select and full fights play at 60 fps,
 every character tried so far, Ryu Hayabusa included since run 9** (his scripts were left
 unrelocated because his file loaded at guest 0x10000; `src/low_memory.cpp` keeps that range
-free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below).
+free). 4K internal (`-Scale 3`) also holds 60 fps (run 10). M0 is done (below). PR #1 (all of
+it, 1440p Windows default) was reviewed by CodeRabbit and merged on 2026-10-29. **Now: the native
+Linux build for the Steam Deck** (branch `linux-native`, below): the SDK and the game build in
+WSL2 and boot natively to the title screen (Linux run 1); the Deck build is on the Deck, waiting
+for the user's first run there.
 
 ### Run 10 (2026-10-29, 4K internal: `--resolution_scale=3 --anisotropic_override=5`; `port/logs/smoke-20261029-104915.log`)
 First run of the build without the trace and guard, and the first at 4K: the renderer reports
@@ -225,12 +229,374 @@ Bootstrap notes: the repo is `../lotr-conquest-360-recomp`'s shape renamed (`lot
 program-stream signature). The disc is extracted to `port/assets` (6.8 GB, 59 files); the
 decrypted image, import names and `.pdata` list are in `private/xex/`.
 
+## Native Linux (2026-10-29, branch linux-native)
+The second stream (the user, 2026-10-29): a native build for the Steam Deck, no Proton or Wine,
+720p by default there. **Builds and boots to the title in WSL2 (Linux run 1, below); the Deck
+build is on the Deck, not yet run there** (every build needs the user's OK).
+- **Scripts** (from graw360-recomp via doax2-360-recomp, which builds and runs natively in WSL2):
+  `tools/setup-linux.sh`, `tools/build-linux.sh`, `tools/build-deck.sh` (Ubuntu 22.04 container
+  `tools/linux/deck.Containerfile`, podman, glibc 2.35 at most), and `tools/steamdeck/`:
+  `make_linux_package.sh` (`--deck deck@steamdeck`; `--with-game` copies `port/assets` until a
+  copy has finished, marked by `.game-complete` beside `game/`), `doa4-linux.sh` (the launcher,
+  which stops if it can't create `user/`), `doa4.toml` (fullscreen, 720p, `resolution_scale = 1`,
+  16x AF, the low-memory reservation on, log flush every second), `README-SteamDeck-Linux.txt`.
+  The Deck folder is `~/recomps/DOA4-360-SteamDeck` (AGENTS.md).
+- **SDK:** the Windows tree 12884d9 (GRAW's set plus vexptefp-underflow, the same as GRAW's), then
+  nine Linux patches in their own commit, tree **282a60a**: GRAW's four (`launch-title-path`,
+  `linux-crash-renderdoc`, `linux-shm-unlink`, `linux-crash-watchdog`; GRAW's Linux tree f481d5e)
+  and DOAX2's three for this engine: `bind-low-port` (system link's VDP socket binds port 1000,
+  which Linux refuses to a normal user), `linux-socket-ioctl` (Winsock FIONBIO/FIONREAD and errno
+  to WSA codes: DOAX2 drew no first frame without both) and `linux-fiber-destroy`. DOA4 imports
+  the same socket calls (`NetDll_bind`, `ioctlsocket`, `recvfrom`, `sendto`, `WSAGetLastError`)
+  and uses XAPI fibers, so these are expected to be needed; not yet proven for DOA4. Then this
+  project's two from the Deck profile (Deck run 1, below): `linux-wait-multiple` and
+  `register-info-log`.
+  - Tree history: **c66e664** was built first (WSL2 and the Deck, 2026-10-29, both tree
+    checks passing), with DOAX2's two socket patches as DOAX2 has them. PR #2's review narrowed
+    both (ff9a4d1, never built by itself): the low ports are mapped only for peers on the local
+    network (broadcast, loopback, the private ranges, link-local), so a server elsewhere keeps
+    port 80 or 53; and `socket_ioctl` passes any command it doesn't translate to `ioctl`
+    unchanged again, as upstream did, instead of failing it. DOAX2 still has the earlier
+    versions. `setup-linux.sh` now swaps an older Linux-patch commit for the new one by itself
+    (no `--force`), so the rebuild keeps the build folder and recompiles only what changed.
+  - **5e1f93a** (built in WSL2 and the Deck container on 2026-10-29: Deck build 2, below) adds
+    the profile's first two fixes on top of ff9a4d1, both Linux-only so the Windows tree stays
+    12884d9:
+    - `linux-wait-multiple`: `WaitMultiple` sleeps on a shared condition variable until a
+      handle may have been signaled, the timeout or 1 ms, instead of `sleep_for` a truncated
+      millisecond count (0 inside every 1 ms alertable slice). Every place a handle's
+      `cond_.notify_all()` signaled it (event, semaphore release, mutant release, timer, thread
+      exit) now calls `NotifyAll()`, which also moves a generation counter on and wakes the
+      sleepers. The alertable slice is rounded up instead of down, so its last millisecond
+      doesn't spin either.
+    - `register-info-log`: `CommandProcessor::WriteRegister` looks up `GetRegisterInfo` only
+      when the GPU log would write the debug message it's for.
+  - **2f06e47** (built in WSL2 and the Deck container on 2026-10-29; not on the Deck, which has
+    5e1f93a) is the review's second round on `bind-low-port`. Mapping by address range missed
+    peers on any other range, such as a VPN's (Tailscale's 100.64/10): a bind to port 1000 used
+    11000, but a send to 1000 went to 1000. Now a destination or source is mapped only on a low
+    port this title has bound itself, whatever its address. System link's peers run the same
+    title and bind the same ports; a server's port 80 or 53, never bound here, keeps its number.
+    `setup-linux.sh` now moves only a checkout at a tree an earlier version of it made
+    (`old_linux_trees`), so an amended Linux-patch commit is left for `--force`.
+  - **282a60a** (Deck build 3, below) rewrites `register-info-log`. Deck run 2 showed its
+    log-level check, a call into `librexruntime` on every register write (`rex::GetLoggerRaw`),
+    still at about 6% of the command thread. A table of the registers `register_table.inc`
+    names, made at compile time (a bit each, 2.5 KB), now tells an unknown register with one
+    load, and only those reach the debug message's own level check.
+- **Host code:** already guarded for non-Windows (`crash_report.cpp`, `cpu_check.cpp`,
+  `timer_resolution.cpp`, `frame_timing.cpp`'s RenderDoc hook), from the LOTR shape. It built on
+  Linux unchanged, with no compiler warnings. One gap from run 1: `ui_style.cpp` looked for the
+  dialog font only in `C:\Windows\Fonts`, so on Linux the runtime's dialogs kept the SDK's 10 px
+  font. It now tries Noto Sans (SteamOS's default sans; the Deck has it and DejaVu Sans) and
+  DejaVu Sans at the Arch and Debian paths. In the Deck build (52e6f37); not yet seen running.
+  Ubuntu's Noto path (`truetype/noto`) was added after it, in review.
+- **WSL2** (Ubuntu 26.04, clang 21, CMake 4.2, podman): checkout `~/doa4-360-recomp`, cloned
+  from the Windows checkout (its `origin`), with `port/assets` a link to the Windows checkout's;
+  SDK in its `third_party/rexglue-sdk-bd833a2`; logs in `~/doa4-logs`. GRAW's and DOAX2's Linux
+  SDKs are other trees (GRAW's host 379fa50, its Deck f481d5e; DOAX2's fc48868), so DOA4 has its
+  own. The `doa4-deck-build` image is the same Containerfile as the existing `doax2-deck-build`,
+  so podman's layer cache should make it quick.
+
+### Linux run 1 (2026-10-29, WSL2, RelWithDebInfo; `~/doa4-logs/run1.log`)
+The user's OK. llvmpipe (software Vulkan: WSL2 shows no GPU to Vulkan here), 720p
+(`--resolution_scale=1`), windowed, `tools/autopilot/boot.txt`, 240 s then SIGINT:
+```
+cd port/out/build/linux-amd64-relwithdebinfo
+./doa4 --no-fullscreen --resolution 720p --resolution_scale=1 --game_data_root <repo>/port/assets \
+  --user_data_root <repo>/port/user-linux --cache_root <repo>/port/cache-linux \
+  --log_file ~/doa4-logs/run1.log --log_flush_interval 1 --log_level debug \
+  --doa4_autopilot=<repo>/tools/autopilot/boot.txt
+```
+- **Boots natively to the title screen**: the warning screens and the logo at 60 fps, then the 3D
+  title (the cherry-blossom stage, PRESS START) at 1.3-2.3 fps, llvmpipe's limit (DOAX2 had
+  1-2 fps on it). The runtime's "Select a Device" save prompt came up after the autopilot's
+  last A press (60 s), so it stayed open; no profile or save was written.
+- No crash and no new errors: the 17 `ResolvePath(cache:\)` errors and the STFS stubs match the
+  Windows logs (the game probes the 360's cache partition for its AFS files). Audio runs through
+  SDL; the game's fibers are created and deleted; the low-memory reservation is logged. SIGINT
+  shut it down cleanly ("Title terminated; hard-exiting process").
+- PipeWire printed a missing `client.conf` on stdout (WSLg has no PipeWire config); harmless.
+- The dialog font gap above.
+
+### The Deck build (2026-10-29, commit 52e6f37; `~/doa4-logs/build-deck.log`)
+The user's OK. `tools/build-deck.sh`, then `--config Release`: the new `doa4-deck-build` image,
+its own SDK (`third_party/rexglue-sdk-bd833a2-deck`, tree c66e664) and both builds. The newest
+glibc any binary needs is 2.35 (`librexruntime`; `doa4` needs 2.34) and the newest libstdc++ is
+GLIBCXX_3.4.32. `make_linux_package.sh` made the 296 MB folder in `private/steamdeck/`.
+- Its `--deck` copy hung: WSL's `~/.ssh` has no key for the Deck (the passwordless key is
+  Windows'), so ssh waited at a password prompt no one could see. The folder went over with
+  WSL's `tar` piped into Windows' ssh instead (executable bits kept, `doa4`'s hash matching), then
+  `port/assets` into `game/` (59 files, 7.22 GB, 62 s; `default.xex`'s hash checked). The script
+  now runs ssh with `BatchMode=yes` and checks the connection first, so a missing key stops it
+  at once with a message; SETUP.md says WSL needs its own key. This copy predates the
+  `.game-complete` marker, so a later `--with-game` would have copied `game/` again; the marker
+  was written there by hand with Deck build 2 (the copy was checked complete).
+- On the Deck (SteamOS 3.9.5, glibc 2.43, RADV VANGOGH): `ldd` finds every library for both
+  programs, and its libstdc++ has GLIBCXX_3.4.32.
+
+### Deck build 2 (2026-10-29, commit 7698c54, tree 5e1f93a)
+The user's OK. The profile's two fixes and the review's earlier changes (tree ff9a4d1, the font
+path). `setup-linux.sh` moved both SDK checkouts from c66e664 by itself and rebuilt only what
+changed: in WSL2 the SDK took 37 s and the game 8 s, and the Deck container's two builds 44 s.
+The four changed SDK files compiled with no new warnings. The newest glibc is still 2.35 and
+the newest libstdc++ GLIBCXX_3.4.32. The package went to the Deck through Windows' ssh
+(`doa4`'s hash matching; `logs/`, `user/` and `game/` untouched, the new launcher included), and
+`doa4-prof.sh` was started again (unit `doa4-prof-215839`, into
+`~/recomps/doa4-prof/1029-215839/`) to profile the next fights.
+
+### Deck run 1 (2026-10-29, the user; Release, 720p, through Steam; logs `doa4_001`-`004.log`)
+Four sessions, menus and several fights. The user's report: gameplay intact, no graphical or
+animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower than the buttons.
+- The game's own frame lines (`DOA4 frames`, every 10 s) explain it: menus and select screens
+  hold 60 fps, but **fights run at 42-50 fps** (median frame 20-23 ms, only 1-7% of frames at a
+  60 Hz vblank, none at 30 Hz). DOA4 steps once per frame, so that is the fight in slow motion
+  (about 75-80% speed), not a 30 Hz lock. On Windows the same fights hold 60.0 (median 16.6 ms).
+- The first session's 1-11 fps stretches were shader compiles (no cache yet); the later
+  sessions, with `user/cache`, had none.
+- Not the cause: the render target path is the host one (`render_target_path_vulkan` unset; FSI
+  is only used when asked for), and the swapchain is 720p (1080p in session 3, on an external
+  display).
+- Next: `~/recomps/doa4-prof.sh` on the Deck (started over SSH, waits for `doa4`): every 10 s the
+  GPU busy %, clocks and the busiest threads' CPU %, plus 8 s perf samples every 40 s, into
+  `~/recomps/doa4-prof/<time>/`. A fight under it says whether the frame waits on the GPU, the
+  GPU command thread or the game's own thread. Cheap test either way: `anisotropic_override` -1
+  (the game's own filtering) instead of 16x.
+- **Profile (session 5, three fights, `~/recomps/doa4-prof/1029-175258`):** the Deck is CPU and
+  power bound, not GPU bound.
+  - GPU busy 28-56% throughout, but four threads each use a whole core, so the CPU runs at
+    2.5-3.1 GHz (3.5 GHz max).
+  - In the 13 windows under 54 fps the GPU command thread is about 90% busy, against about 74%
+    in the 23 windows at 57-60. It is the limit. The other three busy threads don't change
+    between slow and fast windows, because they're waiting:
+    - `Audio Worker` (~96%), an SDK bug. The audio worker's alertable 500 ms `WaitAny` runs as
+      1 ms slices of `PosixConditionBase::WaitMultiple`. When no handle is signaled, that
+      sleeps `duration_cast<milliseconds>(end_time - now)`, which is always 0 inside a 1 ms
+      slice, so `sleep_for(0)` returns at once. Every alertable multi-object wait on Linux
+      spins at 100%, user time only (measured 97% user, 0% system). The same code is in
+      upstream `main`.
+    - `XThread4DFFD6C0` (~99%), the game's job worker `sub_823FC5A0`. It loops forever doing
+      `RtlEnterCriticalSection`, a check of a 16-slot job ring, then `RtlLeaveCriticalSection`,
+      with no wait when the ring is empty. Its samples are almost all that lock traffic, on
+      the lock the main thread posts jobs under.
+    - `Main XThread` (~90%) mostly spins in `sub_827598B0` / `sub_8275A0B8`. They loop on
+      `sub_82761AB8`, which compares two command-processor pointers against a 2 s timeout,
+      with a 100-step delay loop in between: the main thread waits for the GPU command thread
+      to catch up.
+  - The GPU command thread itself: about 65% `librexgpu-xenos`, 17% RADV, 13% libc copies.
+    About a third of it is register writes (`WriteRegister`, `GetRegisterInfo`, the Vulkan
+    `WriteRegister`, `ExecutePacketType0`). `CommandProcessor::WriteRegister` calls
+    `RegisterFile::GetRegisterInfo` (a switch over the whole register table) on every write,
+    only to log an unknown register at debug level: about 10% of the thread.
+- **Planned fixes, smallest first** (each needs the user's OK to build):
+  1. Linux SDK: make `WaitMultiple` really wait. Either sleep the true remaining time, or
+     better, wake on a signal through a shared generation counter and condition variable,
+     with the 1 ms slice as a fallback. **Done** (`linux-wait-multiple`), on the Deck since
+     Deck build 2; its effect is still to be measured.
+  2. SDK: look up the register info only when debug logging is on. **Done**
+     (`register-info-log`), on the Deck since Deck build 2. Its log-level check is now ~6% of
+     the command thread (Deck run 2), so it became a known-register table made at compile time
+     (tree 282a60a, Deck build 3).
+  3. Codegen: midasm hooks that pause or yield in the job worker's empty-ring path and in the
+     main thread's wait loop. **Done** (`src/idle_waits.cpp`, Deck build 3).
+  Each one gets a Deck profile run before the next.
+- **The 120 fps the Steam overlay shows** is the host presenter (mailbox present mode on a
+  120 Hz external display, HDMI audio in this session), repeating the game's last frame. It
+  isn't the game's rate.
+- **PRESS START sits on an opaque white bar** on the title screen (the user's report). Windows
+  draws it too (the 1440p captures), so it isn't the Deck. On the 360 the chrome letters blink
+  with nothing behind them (a 360 recording of the title screen). Probably a quad whose alpha
+  is lost; needs a RenderDoc capture of the title on Windows.
+
+### Deck run 2 (2026-10-29, the user; Deck build 2, tree 5e1f93a; logs `doa4_006`-`007.log`)
+Two sessions of fights on the external display (Release, 720p; session 7's swapchain went to
+1080p), the first under `doa4-prof.sh` (`~/recomps/doa4-prof/1029-215839`). The user's report:
+good for a while, then slower the longer they played, and after quitting the second session
+the Deck "crashed".
+- **Faster.** Fights average 55.7 and 57.1 fps (10 s windows), against 48.9 in run 1's slow
+  windows. Each session starts at 58-59 and slides to about 55 within a few minutes (lowest
+  window 47.9).
+- **The audio worker no longer spins** (gone from the busy threads; ~96% in run 1). Still at a
+  whole core each: the job worker (`XThread86FFE6C0`, `sub_823FC5A0`, ~109%), the main thread
+  (~96-108%, waiting on the command processor) and the GPU command thread (95-98% in fights,
+  the limit). The process still uses about 3.5 cores.
+- **`register-info-log` saved less than expected.** `GetRegisterInfo` is gone, but
+  `rex::GetLoggerRaw`, a call into another library on every register write, is now about 6% of
+  the command thread (1.6-1.7% of the process against `GetRegisterInfo`'s 2.0-2.2%). A table of
+  known registers built once, or the logger looked up once, would remove it.
+- **The slide is heat or power, not something growing.** The seven perf samples (one every
+  40 s) have the same shape from first to last; no function grows. The APU ran at 91-99 C
+  through both sessions (fancontrol warns above 90; the ACPI zone's trips are 100 and 105 C).
+  GPU time per frame rose from about 7.6 to 11.4 ms at a fixed 1600 MHz shader clock. Run 1 was
+  as hot (237 warnings in its 25 minutes).
+- **The user's Deck forces the GPU to 1600 MHz** (Steam's manual GPU clock;
+  `power_dpm_force_performance_level` is `manual`, set again at every Steam start). The Deck's
+  CPU and GPU share 15 W, so with the CPU the limit, a pinned GPU clock takes power the CPU
+  could use. Worth a run with it off (a per-game profile for DOA4).
+- **The quit and the "crash".** Both sessions were quit the same way (Steam button, Exit Game).
+  The game exited cleanly both times (`Title terminated; hard-exiting process`, exit status 0;
+  Steam saw every process end at 22:30:16). After the second, the Steam UI was created again and
+  the user pressed the Steam button twice more (22:30:18-19), then nothing: no kernel errors, no
+  GPU timeout, no logind power-key event. fancontrol kept logging 90-93 C every second until the
+  journal stops at 22:32:06 with no shutdown sequence, which fits a forced power-off by the user.
+  The next boot started at 22:32:35. So the system was alive but the screen or UI was stuck, and
+  something kept the APU hot for two minutes after the game had gone. After the first session the
+  temperature had dropped below 90 within a minute. Steam's background update job was in a loop
+  ("apps still needs updates, run again", ~400 a minute), but it loops all day, game or not.
+  HDMI-CEC "wake TV" calls at the quit got no immediate answer from the TV. Cause not found. If
+  it happens again: leave the Deck as it is and say so, and `ps` / `top` over SSH shows what is
+  running before a reboot.
+
+### Deck build 3 (2026-10-30, commit 05440f1, tree 282a60a)
+The user's OK ("Write and build"): fix 3 and the register table.
+- **The job worker sleeps** (`src/idle_waits.cpp`). `sub_823FC5A0` loops over a ring of 16 jobs
+  at 0x830ADB08 (the index of the slot it takes next, then 12-byte slots: a state byte, the
+  function, its argument) under the critical section at 0x830ADBCC. When its slot holds no posted
+  job (state 1) it takes and drops the lock and looks again. The ring's other users:
+  `sub_823FC650` posts a job into the first free slot from the worker's index (state 1),
+  `sub_823FC700` collects a finished one (state 3, then 0), `sub_823FC778` and `sub_823FC808`
+  cancel. The posters are two loader state machines (`sub_823FE150`, `sub_82401390`) that step
+  once a frame and only look for state 3 then, so nothing in a frame waits on a job.
+  `Doa4JobWorkerIdle`, at the loop's back edge (the `b` at 0x823FC648), sleeps when its slot holds
+  no posted job, until `Doa4JobPosted` (0x823FC6F4, in `sub_823FC650` after it drops the lock)
+  moves a generation counter on and wakes it, or 2 ms. `--doa4_job_worker_sleep=false` spins as
+  before.
+- **The GPU waits sleep after a short spin.** Run 2's main-thread samples were in the fence wait
+  `sub_8275A0B8` and what it calls (`sub_82761AB8`, `sub_829FD950`, the register save and
+  restore: about 14% of the process's samples, half a core); the ring-space wait `sub_827598B0`
+  (run 1) didn't show. `sub_8275A0B8` has no delay at all between polls; `sub_827598B0` counts
+  100 `db16cyc` (a no-op once translated). Both now call `Doa4GpuWaitBegin` where the wait starts
+  (0x8275A14C, 0x82759900) and `Doa4GpuWaitPoll` before each poll through `sub_82761AB8`
+  (0x8275A154, 0x82759918): the wait's first 20 us spin (`doa4_gpu_wait_spin_us`), then each poll
+  sleeps 100 us (`doa4_gpu_wait_sleep_us`, 0 = spin as before; on Linux the sleeping thread's
+  timer slack is 10 us instead of 50). GRAW sleeps 200 us flat in its ring wait. The command
+  processor is the slower thread here, so a late wake costs time only when it has run out of
+  queued work behind the fence.
+- **A "DOA4 waits" line** after each "DOA4 frames" line (every 10 s): the GPU waits (how many, per
+  frame, the time in all, per frame and as a share of the 10 s), how many sleeps, jobs posted and
+  the job worker's sleeps. With the sleeps off it measures the spinning as it was.
+- **`register-info-log` rewritten** (tree 282a60a, above).
+- The hooks are in the shared manifest, so the next Windows build gets them too; no Windows run
+  of them yet (it needs the user's OK).
+- **Built** (2026-10-30): in WSL2 `setup-linux.sh` moved the SDK checkout from 2f06e47 to
+  282a60a by itself (40 s), and the game took 19 s (codegen with the six hooks, then only the
+  changed files); the Deck container's two builds took 48 s. No warnings from the new code (the
+  SDK's are upstream's unused parameters and sign compares). In the generated code each hook
+  sits just before its instruction, none at a label. The newest glibc is still 2.35 and the
+  newest libstdc++ GLIBCXX_3.4.32. The package (`doa4` SHA-256 d2199d7c...) is in WSL's
+  `private/steamdeck/`.
+- **On the Deck** (2026-10-30, the user's OK): copied through Windows' ssh with no game running;
+  `doa4`'s and every library's hash match WSL's, and `logs/`, `user/` and `game/` are untouched.
+  `doa4-prof.sh` is waiting for the game (unit `doa4-prof-053942`, into
+  `~/recomps/doa4-prof/1030-053942/`).
+
+### Deck run 3 (2026-10-30, the user; Deck build 3, tree 282a60a; log `doa4_008.log`)
+Fights on the external display under `doa4-prof.sh` (`~/recomps/doa4-prof/1030-053942`), the
+manual GPU clock still at 1600 MHz. The user's report: much better, no freezes or slowdown. The
+numbers below were read at 05:56 with the session still running (11 minutes in); the perf
+reports come when it ends.
+- **60 fps, and no slide.** 56 of the 67 10-second windows average 59.5-60.1 fps and 7 more
+  57.6-59.4; the median frame is 16.6-16.7 ms in every fight window, and the last windows are as
+  fast as the first (run 2: 55.7 and 57.1 fps, sliding to ~55; run 1: 42-50).
+- **Four slower windows.** The first (55.6 fps) holds a 255 ms frame, the load into a fight. The
+  other three (05:47:02, 05:48:33, 05:54:03; 51.5-52.6 fps, 1% low ~27 fps) have the main thread
+  busier (54-57% against ~40%) and the command thread less (66-72%), fewer GPU waits than frames
+  (0.9 a frame), no jobs posted and nothing else in the log. They are also the only seconds the
+  APU went above 90 C. So something in the game's own frame costs more there (a round's end?);
+  not yet known.
+- **The threads** (`windows.txt`): the main thread 37-46% (about 100% in runs 1 and 2), the GPU
+  command thread 81-95% and the GPU 50-68% busy (28-56% in run 1); no other thread above ~18%.
+  The process uses about 1.8 cores, against about 3.5 in run 2, and the CPU still runs at
+  2.6-3.1 GHz.
+- **"DOA4 waits":** one GPU wait a frame, 8-11 ms of each 16.7 ms frame, so the main thread
+  finishes its part in about 6-8 ms and then waits for the frame's fence (the command thread and
+  the 60 Hz vblank set the pace); 40,000-57,000 sleeps per 10 s, about 85 a frame. The job
+  worker: 0-6 jobs and 4,860-4,944 sleeps per 10 s, nearly all its 2 ms fallback, so it sleeps.
+- **Heat:** the APU at 89 C at 05:56 and above 90 C for 18 seconds in all (93.6 at most, in the
+  three slow windows), against 335 fancontrol warnings up to 100 C over run 2's boot. The APU
+  drew 11 W at 05:56.
+- Next from it: the perf reports (which threads are left, the command thread's register writes
+  with the table), what the game does in the three slow windows, and CodeRabbit's review of
+  Deck build 3's commits (paused on the push; `@coderabbitai review` restarts it). The run with
+  the manual GPU clock off is now optional.
+
+### Deck run 4 (2026-10-30, the user; Deck build 3, tree 282a60a; log `doa4_009.log`)
+Fights on the external display, 09:29-09:46, without the profiler. The user's report: really
+good; then something crashed on the way out of Gaming Mode and came back by itself. Steam's logs
+(`~/.local/share/Steam/logs/`), the journal and `coredumpctl` show two separate things, neither in
+the game's process.
+- **60 fps:** 98 of the 100 10-second windows average 59.5 fps or more, the lowest 58.2; none of
+  run 3's slower windows. One GPU wait a frame, 10-11.6 ms of each frame.
+- **Steam's UI froze after the quit.** The user quit through the Steam menu (`TerminateApp` at
+  09:46:06); the game shut down cleanly (`Title terminated; hard-exiting process`, exit status 0,
+  its scope gone at 09:46:07). Then Steam's UI stopped: nothing in `webhelper.txt` or
+  `webhelper_js.txt` for 50 s, and the APU went from under 90 C to 93-95 C, hotter than in the
+  fights. At 09:46:56 Steam's watchdog killed it (`killing unresponsive browser`; that is the
+  steamwebhelper core dump) and the UI was back at 09:47:02; the heat warnings stopped at
+  09:47:03. Deck run 2's last quit (22:30:16) has the same lines (`WasHidden 1`, `Invalid browser
+  dimensions: 0 x 0`, `WasHidden 0`) and then silence with the APU at 92-93 C; that time the Deck
+  was turned off two minutes later without a clean shutdown (run 2's "UI hang after quitting").
+  It is the only watchdog kill in Steam's logs since 2026-10-22, across F.E.A.R. (Linux), DOAX2
+  (Linux), DOAX3, LOTR, Halo and DOA4. After DOA4's other six Steam-menu quits the UI also took
+  7-21 s to log again, against 3-5 s after most quits of the other games (though F.E.A.R. and
+  LOTR have a few pauses of 40-84 s). The runtime exits with `std::_Exit(0)` straight after
+  `TerminateTitle` (`rex_app.cpp` `OnClosing`), with no swapchain or window teardown and the
+  command thread perhaps mid-frame; F.E.A.R. and DOAX2 exit the same way, so that alone isn't
+  it. Not known yet: what works that hard during the freeze, and why after DOA4.
+- **gamescope crashed on Switch to Desktop (09:47:14), not the game.** gamescope aborted in its
+  own shutdown (`double free or corruption`, in libseat and sd-bus under
+  `wl_event_loop_dispatch`) and Plasma started 5 s later. The same stack at run 3's end (05:58)
+  and at 22:39 on 2026-10-29, in a session where no game ran; the switches after F.E.A.R. and
+  Halo didn't crash. It is SteamOS 3.9.5's gamescope (minidumps in
+  `/var/lib/steamos-log-submitter/pending/minidump/`).
+- Run 3's perf reports and `windows.txt` are pulled (the session ended at 05:58), not yet read.
+- Next from it: a watcher on the Deck (`doa4-exitwatch.py`, started with `systemd-run --user`
+  like the profiler) that, for 150 s after each DOA4 exit, logs every second the GPU's load,
+  clock and power, the APU temperatures, the busiest threads of any process and where each Steam
+  UI and gamescope process waits; then a few quits through the Steam menu. Then decide whether a
+  gentler exit (wait for the GPU, release the swapchain and window before `_Exit`) is the fix.
+
+### Deck run 5 (2026-10-30, the user; Deck build 3, tree 282a60a; log `doa4_010.log`)
+Survival, several rounds, 12:53-13:04. The user's report: very good, no issues, the exit fine;
+the frame rate drops a little when a KO comes up.
+- **60 fps** in 59 of the 66 10-second windows; from 12:57:37 to the quit every window holds
+  60.0 fps with its slowest frame at 19-21 ms. One 210 ms frame as the first fight starts, like
+  run 4's 207 ms.
+- **The KO dips come with a second thread presenting.** Two pairs of windows dip, to 57.7 and
+  54.8 fps (12:54:37-47) and to 57.1 and 55.4 fps (12:55:57-56:07), each with a 1% low of 27 fps:
+  two or three seconds at 27-37 fps, not one long frame. In both, the frame summary comes from
+  another guest thread (t16257) instead of the main one (t16242), so the game presents from a
+  second thread while the main thread is busy; run 4's fights, without Survival, presented only
+  from the main thread. The GPU waits fall in those windows (52-53% of the time, against 60-69%),
+  so the time goes on the CPU side, not the GPU. Most likely Survival loading the next opponent
+  behind the KO; to confirm with the profiler during a Survival run.
+- **The quit was clean:** through Steam at 13:04:26, exit status 0, and Steam's UI logged again
+  2-3 s later, with no watchdog kill. Steam's UI has frozen after 2 of DOA4's 9 Steam-menu quits.
+
 ## Next steps
-1. **Windows stream:** PR #1 (all of M0-M1, Ryu's fix, 1440p default) through CodeRabbit's
-   review, every thread resolved, then merged. 1440p is the launcher default (the user,
-   2026-10-29); M2 checks (more characters, Story, Survival, the critical-hit flash at scale 1).
-2. **Then the Linux stream:** the native Linux build for the Steam Deck (PLAN.md M5), 720p by
-   default, no Proton package first.
+1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
+   in WSL2 (boots to the title), and the Deck build, copied to `~/recomps/DOA4-360-SteamDeck`
+   with the disc's files. Next: the user's Deck run at 720p, through Steam (the folder's README)
+   and the controller (PLAN.md M5: 60 fps in a 2-character fight or a measured list of what
+   stops it); it also shows the dialog font. Its logs stay in the Deck folder's `logs/`: pull
+   them over SSH from Windows. Deck build 2 (above) brought the review's SDK patch changes, the
+   font path and the launcher's `user/` check.
+   Deck run 1 is done (above): fights at 42-50 fps, so the next Linux work is that profile, and
+   the white PRESS START bar on every platform. The profile's first two fixes are on the Deck
+   (Deck build 2). Deck run 2 (above): fights 55-57 fps, the APU at 91-99 C, sliding to ~55.
+   Fix 3 (the job worker and the GPU waits sleep instead of spinning: about one and a half cores
+   of heat and power) and the register table are on the Deck (Deck build 3). Deck run 3 (above):
+   fights hold 60 fps with no slide, the main thread at ~40% and the APU mostly under 90 C. Deck
+   run 4 (above): 60 fps throughout, but Steam's UI froze for 50 s after the quit (as after run
+   2's), and gamescope's crash on Switch to Desktop isn't the game's. Next: the exit watcher and
+   a few quits, run 3's perf reports, the three slow windows, CodeRabbit's review of build 3, then
+   PR #2's merge (the user's call); the white PRESS START bar is a renderer bug on every platform.
+   Deck run 5 (above): Survival at 60 fps except two or three seconds at 27-37 fps after a KO,
+   while a second thread presents (most likely the next opponent loading); the quit was clean.
+   `.recomp.json` now says it plays on Windows, Linux and the Deck (live on recomp.fyi once on
+   master).
+2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
+   scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
 4. An autopilot script into Sparring (`tools/autopilot/`), with the timings from run 2's
    captures, so a fight can be reached without a person at the pad.
@@ -280,6 +646,8 @@ pwsh -NoProfile -File tools/launch.ps1 -Windowed          # a window on the user
 | `port/doa4_manifest.toml` | function hints and hooks for the code generator |
 | `port/src/` | host code: `doa4_app.h` (Vulkan plugin by name, paths, controllers), `crash_report`, `frame_timing`, `fpscr_guard`, `autopilot`, `ui_pad`, `ui_style`, `audio_dump`, `timer_resolution`, `cpu_check` |
 | `tools/patches/` | the SDK patch set `setup.ps1` applies (shared with the sister repos) |
+| `tools/setup-linux.sh`, `build-linux.sh`, `build-deck.sh`, `tools/linux/` | the native Linux and Deck builds (above, "Native Linux"); the seven `linux_patches` in `tools/patches/` |
+| `tools/steamdeck/` | the Deck folder: launcher, `doa4.toml` (720p), README, `make_linux_package.sh` |
 | `tools/autopilot/` | pad scripts for `smoke.ps1 -Autopilot` (`boot.txt`, timings unverified) |
 | `private/` | local only: decrypted image (`xex/`), captures, logs, Deck packages |
 | `docs/` | PLAN, HANDOFF (this), FINDINGS, SETUP |

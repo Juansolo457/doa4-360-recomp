@@ -35,8 +35,19 @@ void AddFonts(ImFontAtlas* atlas) {
   static const ImWchar ranges[] = {0x0020, 0x00FF, 0x0100, 0x017F, 0};  // Latin, Latin Extended-A
   ImFontConfig config;
   config.OversampleH = config.OversampleV = 2;
-  for (const char* path : {"C:\\Windows\\Fonts\\segoeui.ttf", "C:\\Windows\\Fonts\\bahnschrift.ttf",
-                           "C:\\Windows\\Fonts\\arial.ttf"}) {
+#ifdef _WIN32
+  static const char* const kFonts[] = {"C:\\Windows\\Fonts\\segoeui.ttf",
+                                       "C:\\Windows\\Fonts\\bahnschrift.ttf",
+                                       "C:\\Windows\\Fonts\\arial.ttf"};
+#else
+  // Noto Sans (SteamOS's default sans), then DejaVu Sans: each at Arch's (SteamOS's) path, then
+  // Debian's and Ubuntu's.
+  static const char* const kFonts[] = {"/usr/share/fonts/noto/NotoSans-Regular.ttf",
+                                       "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+                                       "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                                       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"};
+#endif
+  for (const char* path : kFonts) {
     std::error_code error;
     if (!std::filesystem::exists(path, error)) continue;
     if (ImFont* font = atlas->AddFontFromFileTTF(path, kRasterSize, &config, ranges)) {

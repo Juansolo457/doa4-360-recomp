@@ -25,6 +25,7 @@ set(DOA4_SOURCES
     src/ui_pad.cpp
     src/timer_resolution.cpp
     src/frame_timing.cpp
+    src/idle_waits.cpp
     src/cpu_check.cpp
     src/fpscr_guard.cpp
     src/low_memory.cpp
