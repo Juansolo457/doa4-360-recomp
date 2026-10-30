@@ -306,7 +306,29 @@ GLIBCXX_3.4.32. `make_linux_package.sh` made the 296 MB folder in `private/steam
   `.game-complete` marker, so a later `--with-game` copies `game/` again unless the marker is
   written there by hand (the copy was checked complete).
 - On the Deck (SteamOS 3.9.5, glibc 2.43, RADV VANGOGH): `ldd` finds every library for both
-  programs, and its libstdc++ has GLIBCXX_3.4.32. Not run there yet.
+  programs, and its libstdc++ has GLIBCXX_3.4.32.
+
+### Deck run 1 (2026-10-29, the user; Release, 720p, through Steam; logs `doa4_001`-`004.log`)
+Four sessions, menus and several fights. The user's report: gameplay intact, no graphical or
+animation problems, but **fights feel laggy, as if at 30 Hz**, the moves slower than the buttons.
+- The game's own frame lines (`DOA4 frames`, every 10 s) explain it: menus and select screens
+  hold 60 fps, but **fights run at 42-50 fps** (median frame 20-23 ms, only 1-7% of frames at a
+  60 Hz vblank, none at 30 Hz). DOA4 steps once per frame, so that is the fight in slow motion
+  (about 75-80% speed), not a 30 Hz lock. On Windows the same fights hold 60.0 (median 16.6 ms).
+- The first session's 1-11 fps stretches were shader compiles (no cache yet); the later
+  sessions, with `user/cache`, had none.
+- Not the cause: the render target path is the host one (`render_target_path_vulkan` unset; FSI
+  is only used when asked for), and the swapchain is 720p (1080p in session 3, on an external
+  display).
+- Next: `~/recomps/doa4-prof.sh` on the Deck (started over SSH, waits for `doa4`): every 10 s the
+  GPU busy %, clocks and the busiest threads' CPU %, plus 8 s perf samples every 40 s, into
+  `~/recomps/doa4-prof/<time>/`. A fight under it says whether the frame waits on the GPU, the
+  GPU command thread or the game's own thread. Cheap test either way: `anisotropic_override` -1
+  (the game's own filtering) instead of 16x.
+- **PRESS START sits on an opaque white bar** on the title screen (the user's report). Windows
+  draws it too (the 1440p captures), so it isn't the Deck. On the 360 the chrome letters blink
+  with nothing behind them (a 360 recording of the title screen). Probably a quad whose alpha
+  is lost; needs a RenderDoc capture of the title on Windows.
 
 ## Next steps
 1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
@@ -317,6 +339,8 @@ GLIBCXX_3.4.32. `make_linux_package.sh` made the 296 MB folder in `private/steam
    them over SSH from Windows. The Deck has the c66e664 build; the review fixes to the SDK
    patches (tree ff9a4d1) and the font path need a WSL2 and a Deck rebuild, and the launcher's
    `user/` check goes over by itself (not while the game runs: bash reads a script as it goes).
+   Deck run 1 is done (above): fights at 42-50 fps, so the next Linux work is that profile, and
+   the white PRESS START bar on every platform.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
