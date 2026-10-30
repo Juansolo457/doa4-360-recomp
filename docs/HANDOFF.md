@@ -484,7 +484,11 @@ The user's OK ("Write and build"): fix 3 and the register table.
   SDK's are upstream's unused parameters and sign compares). In the generated code each hook
   sits just before its instruction, none at a label. The newest glibc is still 2.35 and the
   newest libstdc++ GLIBCXX_3.4.32. The package (`doa4` SHA-256 d2199d7c...) is in WSL's
-  `private/steamdeck/`, not yet on the Deck.
+  `private/steamdeck/`.
+- **On the Deck** (2026-10-30, the user's OK): copied through Windows' ssh with no game running;
+  `doa4`'s and every library's hash match WSL's, and `logs/`, `user/` and `game/` are untouched.
+  `doa4-prof.sh` is waiting for the game (unit `doa4-prof-053942`, into
+  `~/recomps/doa4-prof/1030-053942/`).
 
 ## Next steps
 1. **Linux stream, with the user's OK for each build:** done: the SDK, the build and Linux run 1
@@ -498,9 +502,9 @@ The user's OK ("Write and build"): fix 3 and the register table.
    the white PRESS START bar on every platform. The profile's first two fixes are on the Deck
    (Deck build 2). Deck run 2 (above): fights 55-57 fps, the APU at 91-99 C, sliding to ~55.
    Fix 3 (the job worker and the GPU waits sleep instead of spinning: about one and a half cores
-   of heat and power) and the register table are built (Deck build 3), not yet on the Deck.
-   Next: copy it with the user's OK, a run under the profiler (its "DOA4 waits" lines say how
-   long the GPU waits are), then one with the user's manual GPU clock off.
+   of heat and power) and the register table are on the Deck (Deck build 3), with the profiler
+   waiting. Next: the user's fights under it (its "DOA4 waits" lines say how long the GPU waits
+   are), then a run with the user's manual GPU clock off.
 2. **Windows (merged):** M2 checks (more characters, Story, Survival, the critical-hit flash at
    scale 1), the 1440p default measured.
 3. Find the relocation check that skips Ryu's table (FINDINGS.md), to confirm the reason.
